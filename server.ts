@@ -466,7 +466,7 @@ async function startServer() {
 
     const hasNew = newVersions.length > 0 || newKbs.length > 0 || newBuilds.length > 0;
     const nowUtc = new Date().toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
-    const kind = newVersions.length > 0 ? 'Major Feature Update' : 'Cumulative / Minor Update';
+    const kind = newVersions.length > 0 ? 'Major Feature Update' : 'Security / Cumulative Update';
     const latestKb = newKbs[newKbs.length - 1] || 'KB5129195';
     const title = hasNew
       ? `New Windows 11 ${kind} Detected: ${latestKb}`
@@ -475,6 +475,7 @@ async function startServer() {
     const alertLines = [
       `## ${title}`,
       '',
+      `- **Alert Priority:** \`HIGH (Security / Cumulative — Impacts WUB Risk Meter)\``,
       `- **Source:** [Microsoft Windows 11 Release Information](${RELEASE_INFO_URL})`,
       `- **Detected At (UTC):** \`${nowUtc}\``,
       `- **New Feature Versions (Big Updates):** \`${newVersions.length ? newVersions.join(', ') : 'None'}\``,
@@ -503,23 +504,23 @@ async function startServer() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'User-Agent': 'Win11UpdateNotifier/1.0' },
           body: JSON.stringify({
-            content: `@everyone 🔔 **${title}**\n\n${alertBody}`.slice(0, 1900),
+            content: `@everyone 🚨 **[HIGH PRIORITY SECURITY ALERT] ${title}**\n\n${alertBody}`.slice(0, 1900),
             allowed_mentions: { parse: ['everyone', 'roles', 'users'] },
             embeds: [
               {
                 title,
                 url: RELEASE_INFO_URL,
                 description:
-                  'Live Windows 11 Release Health check completed via Win11 Update Notifier.',
-                color: 3718648,
+                  'Live Windows 11 Release Health check completed via Win11 Update Notifier (WUB Safe-Window Guard).',
+                color: 15548997,
                 fields: [
                   {
                     name: 'Tracked Channels',
-                    value: '26H2 · 26H1 · 24H2',
+                    value: '26H2 · 26H1 · 24H2 · 23H2',
                     inline: true,
                   },
                   {
-                    name: 'Latest KB Packages',
+                    name: 'Latest Security KB Packages',
                     value: newKbs.length ? newKbs.slice(-5).join(', ') : 'KB5129195, KB5127646',
                     inline: true,
                   },
@@ -529,7 +530,7 @@ async function startServer() {
                     inline: false,
                   },
                 ],
-                footer: { text: 'Win11 Update Notifier • Android App & GitHub Actions' },
+                footer: { text: 'Win11 Update Notifier • WUB Safe-Window & Vulnerability Guard' },
                 timestamp: new Date().toISOString(),
               },
             ],
@@ -547,8 +548,8 @@ async function startServer() {
           method: 'POST',
           headers: {
             Title: title,
-            Priority: 'high',
-            Tags: 'windows,bell',
+            Priority: 'urgent',
+            Tags: 'rotating_light,shield,windows',
             Click: RELEASE_INFO_URL,
           },
           body: alertBody,
@@ -580,6 +581,8 @@ async function startServer() {
       title: customTitle,
       summaryDescription,
       pingEveryone = true,
+      priority = 'high',
+      wubSummary,
     } = req.body || {};
     if (
       !webhookUrl ||
@@ -594,24 +597,48 @@ async function startServer() {
       return;
     }
 
+    const isHighPriority = priority === 'high' && Boolean(pingEveryone);
     const targetKb = kb || 'KB5129195';
     const targetBuild = build || '28000.3231';
     const targetVersion = version || '26H2';
     const embedTitle =
       customTitle || `Windows 11 ${targetVersion} Update Alert: ${targetKb} (Build ${targetBuild})`;
 
-    const mentionPrefix = pingEveryone ? '@everyone ' : '';
+    const mentionPrefix = isHighPriority ? '@everyone 🚨 **[HIGH PRIORITY]** ' : 'ℹ️ **[STANDARD INFO — 0 WUB RISK]** ';
     const markdownSummary = summaryDescription
-      ? `${mentionPrefix}🔔 **${embedTitle}**\n${summaryDescription}`.slice(0, 1900)
+      ? `${mentionPrefix}**${embedTitle}**\n${summaryDescription}`.slice(0, 1900)
       : [
-          `${mentionPrefix}🔔 **${embedTitle}**`,
-          `• **Channel:** Windows 11 ${targetVersion}`,
+          `${mentionPrefix}**${embedTitle}**`,
+          `• **Channel / Scope:** Windows 11 ${targetVersion}`,
           `• **KB Package:** \`${targetKb}\``,
           `• **OS Build:** \`${targetBuild}\``,
+          wubSummary ? `• **WUB Safe-Window Status:** ${wubSummary}` : null,
           `• **Release Health:** <${RELEASE_INFO_URL}>`,
-        ].join('\n');
+        ]
+          .filter(Boolean)
+          .join('\n');
 
     try {
+      const fields = [
+        { name: 'Feature Version / Scope', value: String(targetVersion).slice(0, 250), inline: true },
+        { name: 'KB Identifiers', value: String(targetKb).slice(0, 250), inline: true },
+        {
+          name: 'Alert Priority',
+          value: isHighPriority
+            ? 'HIGH — Security / WUB Action Required'
+            : 'STANDARD — Optional Preview (Safe to Skip)',
+          inline: true,
+        },
+        { name: 'OS Builds', value: String(targetBuild).slice(0, 250), inline: false },
+      ];
+      if (wubSummary) {
+        fields.push({
+          name: 'WUB Safe-Window Guard',
+          value: String(wubSummary).slice(0, 250),
+          inline: false,
+        });
+      }
+
       const response = await fetch(webhookUrl.trim(), {
         method: 'POST',
         headers: {
@@ -620,22 +647,22 @@ async function startServer() {
         },
         body: JSON.stringify({
           content: markdownSummary,
-          allowed_mentions: pingEveryone ? { parse: ['everyone', 'roles', 'users'] } : { parse: [] },
+          allowed_mentions: isHighPriority
+            ? { parse: ['everyone', 'roles', 'users'] }
+            : { parse: [] },
           embeds: [
             {
               title: embedTitle,
               url: RELEASE_INFO_URL,
               description:
                 summaryDescription ||
-                'This notification was dispatched from your **Windows 11 Update Notifier (Android & GitHub Actions Suite)**.',
-              color: 5793266, // Discord Blurple #5865F2
-              fields: [
-                { name: 'Feature Version / Scope', value: String(targetVersion).slice(0, 250), inline: true },
-                { name: 'KB Identifiers', value: String(targetKb).slice(0, 250), inline: true },
-                { name: 'OS Builds', value: String(targetBuild).slice(0, 250), inline: false },
-              ],
+                (isHighPriority
+                  ? 'High-Priority Security / Cumulative KB or WUB Safe-Window Alert.'
+                  : 'Standard Informational Update Alert (Optional Preview — 0 WUB Risk Impact).'),
+              color: isHighPriority ? 15548997 : 3718648,
+              fields,
               footer: {
-                text: 'Windows 11 Update Notifier • Instant Discord & Android Alert',
+                text: 'Windows 11 Update Notifier • WUB Safe-Window & Vulnerability Guard',
               },
               timestamp: new Date().toISOString(),
             },
@@ -654,7 +681,9 @@ async function startServer() {
 
       res.json({
         ok: true,
-        message: `Delivered ${targetKb} (Build ${targetBuild}) alert to your Discord server & mobile app!`,
+        message: isHighPriority
+          ? `Delivered HIGH-PRIORITY @everyone alert (${targetKb}) to Discord!`
+          : `Delivered Standard Informational alert (${targetKb} — no @everyone ping) to Discord!`,
       });
     } catch (err) {
       res.status(500).json({
@@ -665,7 +694,7 @@ async function startServer() {
   });
 
   app.post('/api/notify/android-ntfy', async (req, res) => {
-    const { topic, kb, build, version } = req.body || {};
+    const { topic, kb, build, version, priority = 'high', customMessage } = req.body || {};
     if (!topic || typeof topic !== 'string' || topic.trim().length < 3) {
       res.status(400).json({
         ok: false,
@@ -674,6 +703,7 @@ async function startServer() {
       return;
     }
 
+    const isHighPriority = priority === 'high';
     const cleanTopic = topic.trim().replace(/[^a-zA-Z0-9_-]/g, '');
     const targetKb = kb || 'KB5129195';
     const targetBuild = build || '28000.3231';
@@ -683,12 +713,18 @@ async function startServer() {
       const response = await fetch(`https://ntfy.sh/${cleanTopic}`, {
         method: 'POST',
         headers: {
-          Title: `Windows 11 ${targetVersion} Update: ${targetKb}`,
-          Priority: 'high',
-          Tags: 'windows,iphone',
+          Title: isHighPriority
+            ? `[HIGH PRIORITY] Win11 ${targetVersion}: ${targetKb}`
+            : `[INFO - 0 WUB RISK] Win11 ${targetVersion}: ${targetKb}`,
+          Priority: isHighPriority ? 'urgent' : 'default',
+          Tags: isHighPriority ? 'rotating_light,shield,windows' : 'windows,information_source',
           Click: RELEASE_INFO_URL,
         },
-        body: `New Windows 11 ${targetVersion} package ${targetKb} (OS Build ${targetBuild}) detected on Microsoft Release Health.`,
+        body:
+          customMessage ||
+          (isHighPriority
+            ? `HIGH PRIORITY Security/Cumulative Update ${targetKb} (Build ${targetBuild}) detected while monitoring WUB Safe-Window.`
+            : `Optional Preview Update ${targetKb} (Build ${targetBuild}) released. Safe to skip while WUB is active (0 security risk impact).`),
       });
 
       if (!response.ok) {
@@ -702,7 +738,7 @@ async function startServer() {
       res.json({
         ok: true,
         topic: cleanTopic,
-        message: `Sent native Android push notification to ntfy topic "${cleanTopic}"!`,
+        message: `Sent ${isHighPriority ? 'High-Priority' : 'Standard'} Android push notification to ntfy topic "${cleanTopic}"!`,
       });
     } catch (err) {
       res.status(500).json({

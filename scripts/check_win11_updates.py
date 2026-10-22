@@ -24,9 +24,32 @@ def parse_updates(html: str) -> dict:
     kbs = sorted(set(re.findall(r"KB\d{7}", html)))
     builds = sorted(set(re.findall(r"\b(?:22000|22621|22631|26100|26200|28000)\.\d{3,5}\b", html)))
     versions = sorted(set(re.findall(r"\b2[1-9]H[12]\b", html)))
+
+    # Classify KBs by inspecting surrounding table row HTML for Preview/Optional vs Security/Cumulative
+    security_kbs = []
+    preview_kbs = []
+    rows = re.findall(r"<tr[^>]*>([\s\S]*?)</tr>", html, flags=re.IGNORECASE)
+    kb_classification = {}
+    for row in rows:
+        row_kbs = re.findall(r"KB\d{7}", row)
+        if not row_kbs:
+            continue
+        is_preview = bool(re.search(r"preview|optional|non-security|c-release|d-release", row, flags=re.IGNORECASE))
+        for kb in row_kbs:
+            if kb not in kb_classification:
+                kb_classification[kb] = "preview" if is_preview else "security"
+
+    for kb in kbs:
+        if kb_classification.get(kb) == "preview":
+            preview_kbs.append(kb)
+        else:
+            security_kbs.append(kb)
+
     return {
         "versions": versions,
         "kbs": kbs,
+        "security_kbs": sorted(set(security_kbs)),
+        "preview_kbs": sorted(set(preview_kbs)),
         "builds": builds,
     }
 
@@ -35,7 +58,7 @@ def load_state() -> dict:
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    return {"versions": [], "kbs": [], "builds": []}
+    return {"versions": [], "kbs": [], "security_kbs": [], "preview_kbs": [], "builds": []}
 
 
 def save_state(state: dict) -> None:
@@ -50,39 +73,63 @@ def send_discord_webhook(
     title: str,
     message: str,
     new_versions: list,
-    new_kbs: list,
+    new_security_kbs: list,
+    new_preview_kbs: list,
     new_builds: list,
+    is_high_priority: bool,
 ) -> None:
+    # High Priority (Security / Cumulative KB or Feature Release): Red/Urgent color + @everyone ping
+    # Standard Priority (Optional Preview C/D-Release only): Sky Blue color + informational alert
+    embed_color = 15548997 if is_high_priority else 3718648
+    priority_label = (
+        "HIGH PRIORITY — Security / Cumulative KB (Impacts WUB Risk Meter)"
+        if is_high_priority
+        else "STANDARD PRIORITY — Optional Preview Update (0 WUB Security Risk Impact)"
+    )
+
     embed = {
         "title": title,
         "url": RELEASE_INFO_URL,
-        "description": "Microsoft published new Windows 11 release packages on the official Release Health feed.",
-        "color": 5793266,
+        "description": (
+            f"**{priority_label}**\n"
+            "Microsoft published new Windows 11 packages on the official Release Health feed."
+        ),
+        "color": embed_color,
         "fields": [
             {
-                "name": "Feature Versions",
-                "value": ", ".join(new_versions) if new_versions else "No new feature branch",
+                "name": "Security / Cumulative KBs",
+                "value": ", ".join(new_security_kbs[-8:]) if new_security_kbs else "None (0 Security Risk)",
                 "inline": True,
             },
             {
-                "name": "New KB Packages",
-                "value": ", ".join(new_kbs[-10:]) if new_kbs else "None",
+                "name": "Optional Preview KBs",
+                "value": ", ".join(new_preview_kbs[-8:]) if new_preview_kbs else "None",
                 "inline": True,
             },
             {
-                "name": "New OS Builds",
-                "value": ", ".join(new_builds[-10:]) if new_builds else "None",
+                "name": "Feature Versions & OS Builds",
+                "value": (
+                    f"Versions: {', '.join(new_versions) if new_versions else 'Existing'} | "
+                    f"Builds: {', '.join(new_builds[-6:]) if new_builds else 'None'}"
+                ),
                 "inline": False,
             },
         ],
-        "footer": {"text": "Windows 11 Update Notifier • GitHub Actions & Android Suite"},
+        "footer": {"text": "Win11 Update Notifier • WUB Safe-Window & Vulnerability Guard"},
         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }
-    ping_content = f"@everyone 🔔 **{title}**\n\n{message}"[:1900]
+
+    if is_high_priority:
+        ping_content = f"@everyone 🚨 **[HIGH PRIORITY SECURITY ALERT] {title}**\n\n{message}"[:1900]
+        allowed_mentions = {"parse": ["everyone", "roles", "users"]}
+    else:
+        ping_content = f"ℹ️ **[OPTIONAL PREVIEW UPDATE — SAFE TO SKIP IN WUB] {title}**\n\n{message}"[:1900]
+        allowed_mentions = {"parse": []}
+
     payload = json.dumps(
         {
             "content": ping_content,
-            "allowed_mentions": {"parse": ["everyone", "roles", "users"]},
+            "allowed_mentions": allowed_mentions,
             "embeds": [embed],
         }
     ).encode("utf-8")
@@ -107,15 +154,15 @@ def send_telegram_alert(bot_token: str, chat_id: str, message: str) -> None:
     urllib.request.urlopen(req, timeout=15).read()
 
 
-def send_android_ntfy(topic: str, title: str, message: str) -> None:
+def send_android_ntfy(topic: str, title: str, message: str, is_high_priority: bool) -> None:
     url = f"https://ntfy.sh/{topic.strip()}"
     req = urllib.request.Request(
         url,
         data=message.encode("utf-8"),
         headers={
             "Title": title,
-            "Priority": "high",
-            "Tags": "windows,bell",
+            "Priority": "urgent" if is_high_priority else "default",
+            "Tags": "rotating_light,shield,windows" if is_high_priority else "windows,information_source",
             "Click": RELEASE_INFO_URL,
             "User-Agent": "Win11UpdateNotifier/1.0",
         },
@@ -136,29 +183,39 @@ def main() -> None:
     current = parse_updates(html)
     previous = load_state()
 
+    prev_kbs = set(previous.get("kbs", []))
     new_versions = [v for v in current["versions"] if v not in previous.get("versions", [])]
-    new_kbs = [k for k in current["kbs"] if k not in previous.get("kbs", [])]
+    new_kbs = [k for k in current["kbs"] if k not in prev_kbs]
+    new_security_kbs = [k for k in current.get("security_kbs", []) if k in new_kbs]
+    new_preview_kbs = [k for k in current.get("preview_kbs", []) if k in new_kbs]
     new_builds = [b for b in current["builds"] if b not in previous.get("builds", [])]
 
-    # Trigger on first run or whenever any new feature version, KB, or build appears
+    # Trigger on first run or whenever ANY new feature version, Security KB, Preview KB, or build appears
     is_first_run = not previous.get("kbs") and not previous.get("builds")
     has_new = bool(new_versions or new_kbs or new_builds)
 
     if has_new:
-        kind = "Major Feature Update" if new_versions else "Cumulative / Minor Update"
+        # High priority only if a Security/Cumulative KB or Major Feature Version dropped
+        is_high_priority = bool(new_security_kbs or new_versions or is_first_run)
+
         if is_first_run:
             title = f"Windows 11 Tracker Initialized ({len(current['kbs'])} KBs tracked)"
+        elif is_high_priority:
+            latest_sec = new_security_kbs[-1] if new_security_kbs else (new_kbs[-1] if new_kbs else "New Build")
+            title = f"Security / Cumulative Update Detected: {latest_sec}"
         else:
-            latest_kb = new_kbs[-1] if new_kbs else "New Build"
-            title = f"New Windows 11 {kind} Detected: {latest_kb}"
+            latest_prev = new_preview_kbs[-1] if new_preview_kbs else (new_kbs[-1] if new_kbs else "Preview Build")
+            title = f"Optional Preview Update Detected (Safe to Skip in WUB): {latest_prev}"
 
         lines = [
             f"## {title}",
             "",
+            f"- **Alert Priority:** `{'HIGH (Security / Cumulative — Impacts WUB Risk)' if is_high_priority else 'STANDARD (Optional Preview — 0 WUB Risk Impact)'}`",
             f"- **Source:** [Microsoft Windows 11 Release Information]({RELEASE_INFO_URL})",
             f"- **Detected At (UTC):** `{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}`",
-            f"- **New Feature Versions (Big Updates):** `{', '.join(new_versions) if new_versions else 'None'}`",
-            f"- **New KB Packages (Big/Small Updates):** `{', '.join(new_kbs[-10:]) if new_kbs else 'None'}`",
+            f"- **New Security / Cumulative KBs:** `{', '.join(new_security_kbs[-10:]) if new_security_kbs else 'None'}`",
+            f"- **New Optional Preview KBs:** `{', '.join(new_preview_kbs[-10:]) if new_preview_kbs else 'None'}`",
+            f"- **New Feature Versions:** `{', '.join(new_versions) if new_versions else 'None'}`",
             f"- **New OS Builds:** `{', '.join(new_builds[-10:]) if new_builds else 'None'}`",
         ]
         alert_body = "\n".join(lines)
@@ -169,7 +226,16 @@ def main() -> None:
 
         webhook = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
         if webhook:
-            send_discord_webhook(webhook, title, alert_body, new_versions, new_kbs, new_builds)
+            send_discord_webhook(
+                webhook,
+                title,
+                alert_body,
+                new_versions,
+                new_security_kbs,
+                new_preview_kbs,
+                new_builds,
+                is_high_priority,
+            )
 
         tg_token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
         tg_chat = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
@@ -178,7 +244,7 @@ def main() -> None:
 
         ntfy_topic = os.environ.get("NTFY_TOPIC", "").strip()
         if ntfy_topic:
-            send_android_ntfy(ntfy_topic, title, alert_body)
+            send_android_ntfy(ntfy_topic, title, alert_body, is_high_priority)
 
         save_state(current)
         write_github_output("new_update", "true")

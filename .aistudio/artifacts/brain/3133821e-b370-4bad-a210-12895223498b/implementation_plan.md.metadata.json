@@ -1,6 +1,6 @@
 {
-  "summary":  "Updated implementation plan to fix the standalone Android APK Discord digest endpoint and auto-trigger a combined Android notification + Discord @everyone summary card whenever the user selects a start date or preset.",
-  "updatedAt":  "2026-10-22T10:27:23.604507067Z",
+  "summary":  "Revised implementation plan for the Windows Update Blocker (WUB) Safe-Window & Vulnerability Guard incorporating research-backed safe block window thresholds, simplified 3-tier Risk Meter logic, one-tap Mark as Unblocked reset action, strict separation of Security/Cumulative KBs from Optional Preview updates, clean top WUB status bar, and priority-based alerts for every single update.",
+  "updatedAt":  "2026-10-22T13:49:44.800957574Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
