@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="112" fill="#0B0F17"/>
+  <rect x="24" y="24" width="464" height="464" rx="92" stroke="#1E293B" stroke-width="4"/>
+  <!-- Windows 11 Fluent 4-Pane Grid -->
+  <rect x="108" y="108" width="136" height="136" rx="16" fill="#38BDF8"/>
+  <rect x="268" y="108" width="136" height="136" rx="16" fill="#0284C7"/>
+  <rect x="108" y="268" width="136" height="136" rx="16" fill="#0284C7"/>
+  <rect x="268" y="268" width="136" height="136" rx="16" fill="#0369A1"/>
+  <!-- Update / Notification Indicator Badge -->
+  <circle cx="392" cy="120" r="44" fill="#0B0F17"/>
+  <circle cx="392" cy="120" r="32" fill="#5865F2"/>
+  <path d="M392 104V136M392 104L380 116M392 104L404 116" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
