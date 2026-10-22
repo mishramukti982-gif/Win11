@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
-Generates a self-contained Android Gradle project wrapping the built Vite/React
+Generates a zero-dependency Android Gradle project wrapping the built Vite/React
 Windows 11 Update Notifier web application into a native signed Android APK:
 `Win11-Update-Notifier-Android.apk`
 """
+import glob
 import os
+import re
 import shutil
 import struct
 import textwrap
@@ -73,12 +75,55 @@ def ensure_pwa_icons_in_public() -> None:
                 f.write(create_win11_png(sz))
 
 
+def build_inlined_index_html() -> str:
+    """Inlines compiled Vite CSS and JS bundles into a single self-contained HTML string."""
+    index_path = os.path.join(DIST_DIR, "index.html")
+    if not os.path.exists(index_path):
+        return "<html><body style='background:#0B0F17;color:#fff'>Win11 Notifier</body></html>"
+
+    with open(index_path, "r", encoding="utf-8") as f:
+        html = f.read()
+
+    # Inline all CSS files from dist/assets/*.css
+    css_contents = []
+    for css_file in sorted(glob.glob(os.path.join(DIST_DIR, "assets", "*.css"))):
+        with open(css_file, "r", encoding="utf-8") as cf:
+            css_contents.append(cf.read())
+
+    # Inline all JS files from dist/assets/*.js
+    js_contents = []
+    for js_file in sorted(glob.glob(os.path.join(DIST_DIR, "assets", "*.js"))):
+        with open(js_file, "r", encoding="utf-8") as jf:
+            js_contents.append(jf.read())
+
+    # Remove external /assets/*.css and /assets/*.js tags and manifest/registerSW links
+    html = re.sub(r'<link[^>]+href="[^"]*assets/[^"]+\.css"[^>]*>', "", html)
+    html = re.sub(r'<script[^>]+src="[^"]*assets/[^"]+\.js"[^>]*></script>', "", html)
+    html = re.sub(r'<script[^>]+src="[^"]*registerSW\.js"[^>]*></script>', "", html)
+    html = re.sub(r'<link[^>]+rel="manifest"[^>]*>', "", html)
+
+    if css_contents:
+        combined_css = "\n".join(css_contents)
+        html = html.replace("</head>", f"<style>\n{combined_css}\n</style>\n</head>")
+
+    if js_contents:
+        combined_js = "\n".join(js_contents)
+        html = html.replace("</body>", f"<script type=\"module\">\n{combined_js}\n</script>\n</body>")
+
+    return html
+
+
 def main() -> None:
     ensure_pwa_icons_in_public()
 
     if os.path.exists(ANDROID_DIR):
         shutil.rmtree(ANDROID_DIR)
     os.makedirs(ANDROID_DIR, exist_ok=True)
+
+    # Detect ANDROID_HOME / ANDROID_SDK_ROOT if present and write local.properties
+    sdk_dir = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT") or "/usr/local/lib/android/sdk"
+    if os.path.exists(sdk_dir):
+        write_file("local.properties", f"sdk.dir={sdk_dir}\n")
 
     # 1. settings.gradle
     write_file(
@@ -118,11 +163,10 @@ def main() -> None:
         "gradle.properties",
         """
         org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-        android.useAndroidX=true
         """,
     )
 
-    # 4. app/build.gradle
+    # 4. app/build.gradle (Zero external dependencies for 100% reliable build)
     write_file(
         "app/build.gradle",
         """
@@ -149,7 +193,6 @@ def main() -> None:
         }
 
         dependencies {
-            implementation 'androidx.webkit:webkit:1.10.0'
         }
         """,
     )
@@ -169,7 +212,6 @@ def main() -> None:
 
             <uses-permission android:name="android.permission.INTERNET" />
             <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-            <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
             <application
                 android:allowBackup="true"
@@ -191,7 +233,7 @@ def main() -> None:
         """,
     )
 
-    # 7. MainActivity.java using WebViewAssetLoader so ES modules and assets load natively offline/online
+    # 7. MainActivity.java using pure Android SDK WebView + loadDataWithBaseURL
     write_file(
         "app/src/main/java/com/win11notifier/app/MainActivity.java",
         """
@@ -206,14 +248,31 @@ def main() -> None:
         import android.view.Window;
         import android.webkit.WebChromeClient;
         import android.webkit.WebResourceRequest;
-        import android.webkit.WebResourceResponse;
         import android.webkit.WebSettings;
         import android.webkit.WebView;
         import android.webkit.WebViewClient;
-        import androidx.webkit.WebViewAssetLoader;
+        import java.io.ByteArrayOutputStream;
+        import java.io.InputStream;
+        import java.nio.charset.StandardCharsets;
 
         public class MainActivity extends Activity {
             private WebView webView;
+
+            private String loadAssetHtml() {
+                try {
+                    InputStream is = getAssets().open("index.html");
+                    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                    int nRead;
+                    byte[] data = new byte[4096];
+                    while ((nRead = is.read(data, 0, data.length)) != -1) {
+                        buffer.write(data, 0, nRead);
+                    }
+                    is.close();
+                    return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+                } catch (Exception e) {
+                    return "<html><body style='background:#0B0F17;color:white'>Failed to load asset</body></html>";
+                }
+            }
 
             @Override
             protected void onCreate(Bundle savedInstanceState) {
@@ -229,42 +288,31 @@ def main() -> None:
                 webView.setBackgroundColor(Color.parseColor("#0B0F17"));
                 setContentView(webView);
 
-                final WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
-                        .addPathHandler("/", new WebViewAssetLoader.AssetsPathHandler(this))
-                        .build();
-
                 WebSettings settings = webView.getSettings();
                 settings.setJavaScriptEnabled(true);
                 settings.setDomStorageEnabled(true);
                 settings.setDatabaseEnabled(true);
-                settings.setAllowFileAccess(false);
-                settings.setAllowContentAccess(false);
 
                 webView.setWebChromeClient(new WebChromeClient());
                 webView.setWebViewClient(new WebViewClient() {
                     @Override
-                    public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                        Uri url = request.getUrl();
-                        if (url != null && "appassets.androidplatform.net".equals(url.getHost())) {
-                            return assetLoader.shouldInterceptRequest(url);
-                        }
-                        return super.shouldInterceptRequest(view, request);
-                    }
-
-                    @Override
                     public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                         Uri uri = request.getUrl();
                         String host = uri.getHost() != null ? uri.getHost() : "";
-                        if (host.equals("appassets.androidplatform.net")) {
+                        if (host.equals("win11notifier.local")) {
                             return false;
                         }
-                        Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-                        startActivity(intent);
+                        try {
+                            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                            startActivity(intent);
+                        } catch (Exception ignored) {
+                        }
                         return true;
                     }
                 });
 
-                webView.loadUrl("https://appassets.androidplatform.net/index.html");
+                String html = loadAssetHtml();
+                webView.loadDataWithBaseURL("https://win11notifier.local/", html, "text/html", "UTF-8", null);
             }
 
             @Override
@@ -279,11 +327,12 @@ def main() -> None:
         """,
     )
 
-    # 8. Copy built dist/ files into app/src/main/assets/
+    # 8. Write self-contained inlined index.html into app/src/main/assets/index.html
     assets_root = os.path.join(ANDROID_DIR, "app", "src", "main", "assets")
     os.makedirs(assets_root, exist_ok=True)
-    if os.path.exists(DIST_DIR):
-        shutil.copytree(DIST_DIR, assets_root, dirs_exist_ok=True)
+    inlined_html = build_inlined_index_html()
+    with open(os.path.join(assets_root, "index.html"), "w", encoding="utf-8") as f:
+        f.write(inlined_html)
 
     print("Android Gradle project generated at:", ANDROID_DIR)
 
