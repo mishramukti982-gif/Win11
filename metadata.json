@@ -2,5 +2,7 @@
   "name": "Win11 Update Notifier — Android & Discord Suite",
   "description": "Installable Android PWA and automated Discord & GitHub Actions tracker for Microsoft Windows 11 26H2, 26H1, and 24H2 feature and KB cumulative updates.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

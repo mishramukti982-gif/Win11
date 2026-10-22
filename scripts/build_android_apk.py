@@ -6,7 +6,9 @@ Windows 11 Update Notifier web application into a native signed Android APK:
 """
 import os
 import shutil
+import struct
 import textwrap
+import zlib
 
 ANDROID_DIR = "android_build"
 DIST_DIR = "dist"
@@ -19,7 +21,61 @@ def write_file(rel_path: str, content: str) -> None:
         f.write(textwrap.dedent(content).lstrip())
 
 
+def create_win11_png(size: int) -> bytes:
+    """Generates a valid RGBA PNG icon with the Windows 11 Fluent 4-pane grid."""
+    raw = bytearray()
+    pad = int(size * 0.16)
+    gap = max(2, int(size * 0.05))
+    half = size // 2
+
+    for y in range(size):
+        raw.append(0)  # filter type 0
+        for x in range(size):
+            r, g, b = 11, 15, 23  # #0B0F17
+            in_sq = pad <= x < size - pad and pad <= y < size - pad
+            in_gap = abs(x - half) < gap // 2 or abs(y - half) < gap // 2
+            if in_sq and not in_gap:
+                if x < half and y < half:
+                    r, g, b = 56, 189, 248  # #38BDF8
+                elif x >= half and y < half:
+                    r, g, b = 2, 132, 199   # #0284C7
+                elif x < half and y >= half:
+                    r, g, b = 2, 132, 199   # #0284C7
+                else:
+                    r, g, b = 88, 101, 242  # #5865F2
+            raw.extend((r, g, b, 255))
+
+    def make_chunk(chunk_type: bytes, data: bytes) -> bytes:
+        crc = zlib.crc32(chunk_type + data) & 0xFFFFFFFF
+        return struct.pack(">I", len(data)) + chunk_type + data + struct.pack(">I", crc)
+
+    ihdr = struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0)
+    idat = zlib.compress(bytes(raw), 9)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + make_chunk(b"IHDR", ihdr)
+        + make_chunk(b"IDAT", idat)
+        + make_chunk(b"IEND", b"")
+    )
+
+
+def ensure_pwa_icons_in_public() -> None:
+    os.makedirs("public", exist_ok=True)
+    for filename, sz in [
+        ("pwa-192x192.png", 192),
+        ("pwa-512x512.png", 512),
+        ("pwa-maskable-512x512.png", 512),
+        ("apple-touch-icon.png", 180),
+    ]:
+        path = os.path.join("public", filename)
+        if not os.path.exists(path):
+            with open(path, "wb") as f:
+                f.write(create_win11_png(sz))
+
+
 def main() -> None:
+    ensure_pwa_icons_in_public()
+
     if os.path.exists(ANDROID_DIR):
         shutil.rmtree(ANDROID_DIR)
     os.makedirs(ANDROID_DIR, exist_ok=True)
@@ -86,16 +142,6 @@ def main() -> None:
                 versionName "1.0.0"
             }
 
-            buildTypes {
-                release {
-                    minifyEnabled false
-                    signingConfig signingConfigs.debug
-                }
-                debug {
-                    signingConfig signingConfigs.debug
-                }
-            }
-
             compileOptions {
                 sourceCompatibility JavaVersion.VERSION_17
                 targetCompatibility JavaVersion.VERSION_17
@@ -108,7 +154,13 @@ def main() -> None:
         """,
     )
 
-    # 5. AndroidManifest.xml
+    # 5. Generate Android launcher icon PNG in mipmap-xxxhdpi
+    mipmap_dir = os.path.join(ANDROID_DIR, "app", "src", "main", "res", "mipmap-xxxhdpi")
+    os.makedirs(mipmap_dir, exist_ok=True)
+    with open(os.path.join(mipmap_dir, "ic_launcher.png"), "wb") as f:
+        f.write(create_win11_png(192))
+
+    # 6. AndroidManifest.xml
     write_file(
         "app/src/main/AndroidManifest.xml",
         """
@@ -121,6 +173,7 @@ def main() -> None:
 
             <application
                 android:allowBackup="true"
+                android:icon="@mipmap/ic_launcher"
                 android:label="Win11 Notifier"
                 android:usesCleartextTraffic="true"
                 android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
@@ -138,7 +191,7 @@ def main() -> None:
         """,
     )
 
-    # 6. MainActivity.java using WebViewAssetLoader so ES modules and assets load natively offline/online
+    # 7. MainActivity.java using WebViewAssetLoader so ES modules and assets load natively offline/online
     write_file(
         "app/src/main/java/com/win11notifier/app/MainActivity.java",
         """
@@ -177,7 +230,7 @@ def main() -> None:
                 setContentView(webView);
 
                 final WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
-                        .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+                        .addPathHandler("/", new WebViewAssetLoader.AssetsPathHandler(this))
                         .build();
 
                 WebSettings settings = webView.getSettings();
@@ -191,7 +244,11 @@ def main() -> None:
                 webView.setWebViewClient(new WebViewClient() {
                     @Override
                     public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                        return assetLoader.shouldInterceptRequest(request.getUrl());
+                        Uri url = request.getUrl();
+                        if (url != null && "appassets.androidplatform.net".equals(url.getHost())) {
+                            return assetLoader.shouldInterceptRequest(url);
+                        }
+                        return super.shouldInterceptRequest(view, request);
                     }
 
                     @Override
@@ -207,7 +264,7 @@ def main() -> None:
                     }
                 });
 
-                webView.loadUrl("https://appassets.androidplatform.net/assets/public/index.html");
+                webView.loadUrl("https://appassets.androidplatform.net/index.html");
             }
 
             @Override
@@ -222,23 +279,11 @@ def main() -> None:
         """,
     )
 
-    # 7. Copy built dist/ files into app/src/main/assets/public
-    assets_public = os.path.join(ANDROID_DIR, "app", "src", "main", "assets", "public")
-    os.makedirs(assets_public, exist_ok=True)
+    # 8. Copy built dist/ files into app/src/main/assets/
+    assets_root = os.path.join(ANDROID_DIR, "app", "src", "main", "assets")
+    os.makedirs(assets_root, exist_ok=True)
     if os.path.exists(DIST_DIR):
-        shutil.copytree(DIST_DIR, assets_public, dirs_exist_ok=True)
-        # Rewrite root-relative paths (/assets/...) to relative (./assets/...) for WebViewAssetLoader
-        index_html_path = os.path.join(assets_public, "index.html")
-        if os.path.exists(index_html_path):
-            with open(index_html_path, "r", encoding="utf-8") as f:
-                html = f.read()
-            html = html.replace('src="/assets/', 'src="./assets/')
-            html = html.replace('href="/assets/', 'href="./assets/')
-            html = html.replace('href="/manifest.webmanifest"', 'href="./manifest.webmanifest"')
-            html = html.replace('href="/icon.svg"', 'href="./icon.svg"')
-            html = html.replace('href="/apple-touch-icon.png"', 'href="./apple-touch-icon.png"')
-            with open(index_html_path, "w", encoding="utf-8") as f:
-                f.write(html)
+        shutil.copytree(DIST_DIR, assets_root, dirs_exist_ok=True)
 
     print("Android Gradle project generated at:", ANDROID_DIR)
 

@@ -20,10 +20,32 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install dependencies and build web bundle
+      - name: Normalize package.json for public npm registry and build web bundle
         run: |
-          npm install
-          npm run build
+          python3 scripts/build_android_apk.py
+          node -e '
+            const fs = require("fs");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            pkg.dependencies = {
+              "lucide-react": "^0.475.0",
+              "react": "^19.0.0",
+              "react-dom": "^19.0.0"
+            };
+            pkg.devDependencies = {
+              "@tailwindcss/vite": "^4.0.9",
+              "@types/node": "^22.10.0",
+              "@types/react": "^19.0.0",
+              "@types/react-dom": "^19.0.0",
+              "@vitejs/plugin-react": "^4.3.4",
+              "tailwindcss": "^4.0.9",
+              "typescript": "^5.7.3",
+              "vite": "^6.2.0",
+              "vite-plugin-pwa": "^0.21.1"
+            };
+            fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2));
+          '
+          npm install --legacy-peer-deps
+          npx vite build
           cd dist && zip -r ../Win11-Update-Notifier-Web-Bundle.zip . && cd ..
 
       - name: Set up JDK 17 for Android build
@@ -44,8 +66,8 @@ jobs:
         run: |
           python3 scripts/build_android_apk.py
           cd android_build
-          gradle assembleRelease --no-daemon
-          cp app/build/outputs/apk/release/app-release.apk ../Win11-Update-Notifier-Android.apk
+          gradle assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk ../Win11-Update-Notifier-Android.apk
 
       - name: Publish APK & Web Bundle to GitHub Releases (Win11 Repo)
         env:

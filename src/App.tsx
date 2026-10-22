@@ -268,9 +268,9 @@ export default function App() {
   // GitHub Repo & Releases configuration (Default repo name: Win11)
   const [githubOwner, setGithubOwner] = useState<string>(() => {
     try {
-      return localStorage.getItem('win11_github_owner') || 'mishramukti982';
+      return localStorage.getItem('win11_github_owner') || 'mishramukti982-gif';
     } catch {
-      return 'mishramukti982';
+      return 'mishramukti982-gif';
     }
   });
   const [githubRepoName, setGithubRepoName] = useState<string>(() => {
