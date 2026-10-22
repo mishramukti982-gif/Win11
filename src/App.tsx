@@ -465,6 +465,23 @@ export default function App() {
 
     showToast(notifTitle, notifBody, 'success');
 
+    // 1. If running inside the installed Android APK, trigger native Android NotificationManager via AndroidBridge
+    const winWithBridge = window as unknown as {
+      AndroidBridge?: {
+        showNotification?: (title: string, message: string) => void;
+        requestNotificationPermission?: () => void;
+      };
+    };
+    if (winWithBridge.AndroidBridge?.showNotification) {
+      try {
+        winWithBridge.AndroidBridge.showNotification(notifTitle, notifBody);
+        return;
+      } catch {
+        // continue to web fallback
+      }
+    }
+
+    // 2. Web / PWA Notification fallback
     if ('Notification' in window) {
       try {
         let perm = Notification.permission;
@@ -524,29 +541,46 @@ export default function App() {
           kb: sampleUpdate.kb,
           build: sampleUpdate.build,
           version: sampleUpdate.version,
+          pingEveryone: true,
           title: `New Windows 11 ${sampleUpdate.version} Update: ${sampleUpdate.kb} (Build ${sampleUpdate.build})`,
         }),
       });
       const data = await resp.json();
       if (resp.ok && data.ok) {
-        showToast('Discord Alert Delivered', data.message, 'success');
+        showToast('Discord @everyone Alert Delivered', data.message, 'success');
       } else {
         showToast('Discord Webhook Error', data.error || 'Failed to send webhook.', 'warning');
       }
     } catch {
-      // Fallback for standalone APK WebView: post directly to Discord webhook URL
+      // Fallback for standalone APK WebView: post directly to Discord webhook URL with @everyone + allowed_mentions + embed
       try {
+        const embedTitle = `New Windows 11 ${sampleUpdate.version} Update: ${sampleUpdate.kb} (Build ${sampleUpdate.build})`;
         const directResp = await fetch(discordWebhookUrl.trim(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            content: `🔔 **New Windows 11 ${sampleUpdate.version} Update: ${sampleUpdate.kb} (Build ${sampleUpdate.build})**`,
+            content: `@everyone 🔔 **${embedTitle}**\n• **Channel:** Windows 11 ${sampleUpdate.version}\n• **KB Package:** \`${sampleUpdate.kb}\`\n• **OS Build:** \`${sampleUpdate.build}\``,
+            allowed_mentions: { parse: ['everyone', 'roles', 'users'] },
+            embeds: [
+              {
+                title: embedTitle,
+                url: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+                description:
+                  'Dispatched from your **Windows 11 Update Notifier Android App**.',
+                color: 5793266,
+                fields: [
+                  { name: 'Feature Version', value: sampleUpdate.version, inline: true },
+                  { name: 'KB Identifier', value: sampleUpdate.kb, inline: true },
+                  { name: 'OS Build', value: sampleUpdate.build, inline: true },
+                ],
+              },
+            ],
           }),
         });
         if (directResp.ok) {
           showToast(
-            'Discord Alert Delivered',
-            `Sent ${sampleUpdate.kb} directly to your Discord channel!`,
+            'Discord @everyone Alert Delivered',
+            `Pinged @everyone with ${sampleUpdate.kb} directly in your Discord channel!`,
             'success'
           );
         } else {

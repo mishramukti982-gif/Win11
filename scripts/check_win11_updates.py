@@ -57,7 +57,7 @@ def send_discord_webhook(
         "title": title,
         "url": RELEASE_INFO_URL,
         "description": "Microsoft published new Windows 11 release packages on the official Release Health feed.",
-        "color": 3718648,
+        "color": 5793266,
         "fields": [
             {
                 "name": "Feature Versions",
@@ -78,7 +78,14 @@ def send_discord_webhook(
         "footer": {"text": "Windows 11 Update Notifier • GitHub Actions & Android Suite"},
         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }
-    payload = json.dumps({"content": message[:1900], "embeds": [embed]}).encode("utf-8")
+    ping_content = f"@everyone 🔔 **{title}**\n\n{message}"[:1900]
+    payload = json.dumps(
+        {
+            "content": ping_content,
+            "allowed_mentions": {"parse": ["everyone", "roles", "users"]},
+            "embeds": [embed],
+        }
+    ).encode("utf-8")
     req = urllib.request.Request(
         webhook_url,
         data=payload,

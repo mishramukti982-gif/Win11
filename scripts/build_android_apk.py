@@ -3,6 +3,8 @@
 Generates a zero-dependency Android Gradle project wrapping the built Vite/React
 Windows 11 Update Notifier web application into a native signed Android APK:
 `Win11-Update-Notifier-Android.apk`
+Includes Android 13+ POST_NOTIFICATIONS runtime permission request,
+NotificationChannel registration, and native AndroidBridge.showNotification(title, body).
 """
 import glob
 import os
@@ -84,19 +86,16 @@ def build_inlined_index_html() -> str:
     with open(index_path, "r", encoding="utf-8") as f:
         html = f.read()
 
-    # Inline all CSS files from dist/assets/*.css
     css_contents = []
     for css_file in sorted(glob.glob(os.path.join(DIST_DIR, "assets", "*.css"))):
         with open(css_file, "r", encoding="utf-8") as cf:
             css_contents.append(cf.read())
 
-    # Inline all JS files from dist/assets/*.js
     js_contents = []
     for js_file in sorted(glob.glob(os.path.join(DIST_DIR, "assets", "*.js"))):
         with open(js_file, "r", encoding="utf-8") as jf:
             js_contents.append(jf.read())
 
-    # Remove external /assets/*.css and /assets/*.js tags and manifest/registerSW links
     html = re.sub(r'<link[^>]+href="[^"]*assets/[^"]+\.css"[^>]*>', "", html)
     html = re.sub(r'<script[^>]+src="[^"]*assets/[^"]+\.js"[^>]*></script>', "", html)
     html = re.sub(r'<script[^>]+src="[^"]*registerSW\.js"[^>]*></script>', "", html)
@@ -120,7 +119,6 @@ def main() -> None:
         shutil.rmtree(ANDROID_DIR)
     os.makedirs(ANDROID_DIR, exist_ok=True)
 
-    # Detect ANDROID_HOME / ANDROID_SDK_ROOT if present and write local.properties
     sdk_dir = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT") or "/usr/local/lib/android/sdk"
     if os.path.exists(sdk_dir):
         write_file("local.properties", f"sdk.dir={sdk_dir}\n")
@@ -166,7 +164,7 @@ def main() -> None:
         """,
     )
 
-    # 4. app/build.gradle (Zero external dependencies for 100% reliable build)
+    # 4. app/build.gradle
     write_file(
         "app/build.gradle",
         """
@@ -182,8 +180,8 @@ def main() -> None:
                 applicationId "com.win11notifier.app"
                 minSdk 24
                 targetSdk 34
-                versionCode 1
-                versionName "1.0.0"
+                versionCode 2
+                versionName "1.1.0"
             }
 
             compileOptions {
@@ -203,7 +201,7 @@ def main() -> None:
     with open(os.path.join(mipmap_dir, "ic_launcher.png"), "wb") as f:
         f.write(create_win11_png(192))
 
-    # 6. AndroidManifest.xml
+    # 6. AndroidManifest.xml with POST_NOTIFICATIONS + VIBRATE
     write_file(
         "app/src/main/AndroidManifest.xml",
         """
@@ -212,6 +210,8 @@ def main() -> None:
 
             <uses-permission android:name="android.permission.INTERNET" />
             <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+            <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+            <uses-permission android:name="android.permission.VIBRATE" />
 
             <application
                 android:allowBackup="true"
@@ -233,19 +233,26 @@ def main() -> None:
         """,
     )
 
-    # 7. MainActivity.java using pure Android SDK WebView + loadDataWithBaseURL
+    # 7. MainActivity.java with NotificationChannel + Android 13+ POST_NOTIFICATIONS runtime request + JavascriptInterface
     write_file(
         "app/src/main/java/com/win11notifier/app/MainActivity.java",
         """
         package com.win11notifier.app;
 
         import android.app.Activity;
+        import android.app.Notification;
+        import android.app.NotificationChannel;
+        import android.app.NotificationManager;
+        import android.app.PendingIntent;
+        import android.content.Context;
         import android.content.Intent;
+        import android.content.pm.PackageManager;
         import android.graphics.Color;
         import android.net.Uri;
         import android.os.Build;
         import android.os.Bundle;
         import android.view.Window;
+        import android.webkit.JavascriptInterface;
         import android.webkit.WebChromeClient;
         import android.webkit.WebResourceRequest;
         import android.webkit.WebSettings;
@@ -256,7 +263,86 @@ def main() -> None:
         import java.nio.charset.StandardCharsets;
 
         public class MainActivity extends Activity {
+            private static final String CHANNEL_ID = "win11_updates_channel";
+            private static final int PERMISSION_REQ_CODE = 1001;
             private WebView webView;
+            private int notificationIdCounter = 2000;
+
+            public class WebAppInterface {
+                Context mContext;
+
+                WebAppInterface(Context c) {
+                    mContext = c;
+                }
+
+                @JavascriptInterface
+                public void requestNotificationPermission() {
+                    ensureNotificationPermission();
+                }
+
+                @JavascriptInterface
+                public void showNotification(String title, String message) {
+                    ensureNotificationPermission();
+                    sendNativeNotification(title, message);
+                }
+            }
+
+            private void createNotificationChannel() {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    NotificationChannel channel = new NotificationChannel(
+                            CHANNEL_ID,
+                            "Windows 11 Release Alerts",
+                            NotificationManager.IMPORTANCE_HIGH
+                    );
+                    channel.setDescription("Notifications for major and minor Microsoft Windows 11 KB updates");
+                    channel.enableLights(true);
+                    channel.setLightColor(Color.parseColor("#38BDF8"));
+                    channel.enableVibration(true);
+                    NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                    if (manager != null) {
+                        manager.createNotificationChannel(channel);
+                    }
+                }
+            }
+
+            private void ensureNotificationPermission() {
+                if (Build.VERSION.SDK_INT >= 33) {
+                    if (checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, PERMISSION_REQ_CODE);
+                    }
+                }
+            }
+
+            private void sendNativeNotification(String title, String body) {
+                try {
+                    NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                    if (manager == null) return;
+
+                    Intent intent = new Intent(this, MainActivity.class);
+                    intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                            ? PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                            : PendingIntent.FLAG_UPDATE_CURRENT;
+                    PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, flags);
+
+                    Notification.Builder builder;
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        builder = new Notification.Builder(this, CHANNEL_ID);
+                    } else {
+                        builder = new Notification.Builder(this);
+                    }
+
+                    builder.setSmallIcon(android.R.drawable.stat_sys_download_done)
+                            .setContentTitle(title)
+                            .setContentText(body)
+                            .setStyle(new Notification.BigTextStyle().bigText(body))
+                            .setContentIntent(pendingIntent)
+                            .setAutoCancel(true);
+
+                    manager.notify(notificationIdCounter++, builder.build());
+                } catch (Exception ignored) {
+                }
+            }
 
             private String loadAssetHtml() {
                 try {
@@ -278,6 +364,9 @@ def main() -> None:
             protected void onCreate(Bundle savedInstanceState) {
                 super.onCreate(savedInstanceState);
 
+                createNotificationChannel();
+                ensureNotificationPermission();
+
                 Window window = getWindow();
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     window.setStatusBarColor(Color.parseColor("#0B0F17"));
@@ -293,6 +382,7 @@ def main() -> None:
                 settings.setDomStorageEnabled(true);
                 settings.setDatabaseEnabled(true);
 
+                webView.addJavascriptInterface(new WebAppInterface(this), "AndroidBridge");
                 webView.setWebChromeClient(new WebChromeClient());
                 webView.setWebViewClient(new WebViewClient() {
                     @Override

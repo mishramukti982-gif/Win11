@@ -503,7 +503,8 @@ async function startServer() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'User-Agent': 'Win11UpdateNotifier/1.0' },
           body: JSON.stringify({
-            content: alertBody.slice(0, 1900),
+            content: `@everyone 🔔 **${title}**\n\n${alertBody}`.slice(0, 1900),
+            allowed_mentions: { parse: ['everyone', 'roles', 'users'] },
             embeds: [
               {
                 title,
@@ -571,7 +572,7 @@ async function startServer() {
   });
 
   app.post('/api/notify/discord', async (req, res) => {
-    const { webhookUrl, kb, build, version, title: customTitle } = req.body || {};
+    const { webhookUrl, kb, build, version, title: customTitle, pingEveryone = true } = req.body || {};
     if (
       !webhookUrl ||
       typeof webhookUrl !== 'string' ||
@@ -591,8 +592,9 @@ async function startServer() {
     const embedTitle =
       customTitle || `Windows 11 ${targetVersion} Update Alert: ${targetKb} (Build ${targetBuild})`;
 
+    const mentionPrefix = pingEveryone ? '@everyone ' : '';
     const markdownSummary = [
-      `🔔 **${embedTitle}**`,
+      `${mentionPrefix}🔔 **${embedTitle}**`,
       `• **Channel:** Windows 11 ${targetVersion}`,
       `• **KB Package:** \`${targetKb}\``,
       `• **OS Build:** \`${targetBuild}\``,
@@ -608,6 +610,7 @@ async function startServer() {
         },
         body: JSON.stringify({
           content: markdownSummary,
+          allowed_mentions: pingEveryone ? { parse: ['everyone', 'roles', 'users'] } : { parse: [] },
           embeds: [
             {
               title: embedTitle,
