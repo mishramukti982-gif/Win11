@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan for the Windows 11 Update Notifier Android-installable PWA, Discord webhook dispatcher, live Microsoft Release Health proxy, and automated GitHub Actions repository workflow.",
-  "updatedAt":  "2026-10-22T08:29:27.637111688Z",
+  "summary":  "Updated implementation plan to fix the standalone Android APK Discord digest endpoint and auto-trigger a combined Android notification + Discord @everyone summary card whenever the user selects a start date or preset.",
+  "updatedAt":  "2026-10-22T10:27:23.604507067Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

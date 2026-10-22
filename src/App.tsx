@@ -1277,7 +1277,9 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={handleSendSinceDateDigestToDiscord}
+                onClick={() =>
+                  dispatchDateRangeNotificationAndDiscord(sinceDate, sinceChannelFilter, false)
+                }
                 disabled={sendingDigestDiscord || updatesSinceSelectedDate.length === 0}
                 className="min-h-[40px] px-4 py-2 text-xs font-semibold text-white bg-[#5865F2] hover:bg-[#4752C4] disabled:opacity-50 rounded-lg transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5 cursor-pointer"
               >
@@ -1285,7 +1287,7 @@ export default function App() {
                 <span>
                   {sendingDigestDiscord
                     ? 'Sending Digest...'
-                    : `Send All (${updatesSinceSelectedDate.length}) to Discord`}
+                    : `Send All (${updatesSinceSelectedDate.length}) to Discord & Android`}
                 </span>
               </button>
             </div>
@@ -1300,7 +1302,7 @@ export default function App() {
                   htmlFor="since-date-input"
                   className="block text-xs font-medium text-slate-300"
                 >
-                  Select Start Date (From Date → Now)
+                  Select Start Date (Auto-Notifies Android &amp; Discord @everyone)
                 </label>
                 <div className="relative">
                   <Calendar className="w-4 h-4 text-sky-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -1309,7 +1311,7 @@ export default function App() {
                     type="date"
                     value={sinceDate}
                     max={todayIso}
-                    onChange={(e) => setSinceDate(e.target.value)}
+                    onChange={(e) => handleDateChangeAndNotify(e.target.value)}
                     className="w-full min-h-[44px] pl-10 pr-4 py-2 bg-[#0B0F17] border border-slate-700 rounded-lg text-sm text-white font-mono-tabular focus:outline-none focus:border-sky-400"
                   />
                 </div>

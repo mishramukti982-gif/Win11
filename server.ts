@@ -572,12 +572,20 @@ async function startServer() {
   });
 
   app.post('/api/notify/discord', async (req, res) => {
-    const { webhookUrl, kb, build, version, title: customTitle, pingEveryone = true } = req.body || {};
+    const {
+      webhookUrl,
+      kb,
+      build,
+      version,
+      title: customTitle,
+      summaryDescription,
+      pingEveryone = true,
+    } = req.body || {};
     if (
       !webhookUrl ||
       typeof webhookUrl !== 'string' ||
-      !webhookUrl.trim().startsWith('https://discord.com/api/webhooks/') &&
-        !webhookUrl.trim().startsWith('https://discordapp.com/api/webhooks/')
+      (!webhookUrl.trim().startsWith('https://discord.com/api/webhooks/') &&
+        !webhookUrl.trim().startsWith('https://discordapp.com/api/webhooks/'))
     ) {
       res.status(400).json({
         ok: false,
@@ -593,13 +601,15 @@ async function startServer() {
       customTitle || `Windows 11 ${targetVersion} Update Alert: ${targetKb} (Build ${targetBuild})`;
 
     const mentionPrefix = pingEveryone ? '@everyone ' : '';
-    const markdownSummary = [
-      `${mentionPrefix}🔔 **${embedTitle}**`,
-      `• **Channel:** Windows 11 ${targetVersion}`,
-      `• **KB Package:** \`${targetKb}\``,
-      `• **OS Build:** \`${targetBuild}\``,
-      `• **Release Health:** <${RELEASE_INFO_URL}>`,
-    ].join('\n');
+    const markdownSummary = summaryDescription
+      ? `${mentionPrefix}🔔 **${embedTitle}**\n${summaryDescription}`.slice(0, 1900)
+      : [
+          `${mentionPrefix}🔔 **${embedTitle}**`,
+          `• **Channel:** Windows 11 ${targetVersion}`,
+          `• **KB Package:** \`${targetKb}\``,
+          `• **OS Build:** \`${targetBuild}\``,
+          `• **Release Health:** <${RELEASE_INFO_URL}>`,
+        ].join('\n');
 
     try {
       const response = await fetch(webhookUrl.trim(), {
@@ -616,12 +626,13 @@ async function startServer() {
               title: embedTitle,
               url: RELEASE_INFO_URL,
               description:
+                summaryDescription ||
                 'This notification was dispatched from your **Windows 11 Update Notifier (Android & GitHub Actions Suite)**.',
               color: 5793266, // Discord Blurple #5865F2
               fields: [
-                { name: 'Feature Version', value: targetVersion, inline: true },
-                { name: 'KB Identifier', value: targetKb, inline: true },
-                { name: 'OS Build', value: targetBuild, inline: true },
+                { name: 'Feature Version / Scope', value: String(targetVersion).slice(0, 250), inline: true },
+                { name: 'KB Identifiers', value: String(targetKb).slice(0, 250), inline: true },
+                { name: 'OS Builds', value: String(targetBuild).slice(0, 250), inline: false },
               ],
               footer: {
                 text: 'Windows 11 Update Notifier • Instant Discord & Android Alert',
