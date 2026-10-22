@@ -13,6 +13,8 @@ const STATE_FILE = path.join(__dirname, 'state', 'last_seen.json');
 const ALERT_FILE = path.join(__dirname, 'state', 'latest_alert.md');
 const PYTHON_SCRIPT_FILE = path.join(__dirname, 'scripts', 'check_win11_updates.py');
 const WORKFLOW_FILE = path.join(__dirname, '.github', 'workflows', 'win11-update-notifier.yml');
+const APK_WORKFLOW_FILE = path.join(__dirname, '.github', 'workflows', 'android-apk-release.yml');
+const APK_BUILDER_FILE = path.join(__dirname, 'scripts', 'build_android_apk.py');
 
 export interface Win11UpdateItem {
   id: string;
@@ -703,6 +705,12 @@ async function startServer() {
     const workflowYaml = fs.existsSync(WORKFLOW_FILE)
       ? fs.readFileSync(WORKFLOW_FILE, 'utf-8')
       : '';
+    const apkWorkflowYaml = fs.existsSync(APK_WORKFLOW_FILE)
+      ? fs.readFileSync(APK_WORKFLOW_FILE, 'utf-8')
+      : '';
+    const apkBuilderScript = fs.existsSync(APK_BUILDER_FILE)
+      ? fs.readFileSync(APK_BUILDER_FILE, 'utf-8')
+      : '';
     const stateJson = fs.existsSync(STATE_FILE)
       ? fs.readFileSync(STATE_FILE, 'utf-8')
       : '{}';
@@ -713,6 +721,8 @@ async function startServer() {
     res.json({
       pythonScript,
       workflowYaml,
+      apkWorkflowYaml,
+      apkBuilderScript,
       stateJson,
       latestAlertMd,
     });

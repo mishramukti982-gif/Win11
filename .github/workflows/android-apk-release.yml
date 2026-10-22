@@ -1,0 +1,69 @@
+name: Build & Publish Android APK to GitHub Releases
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies and build web bundle
+        run: |
+          npm install
+          npm run build
+          cd dist && zip -r ../Win11-Update-Notifier-Web-Bundle.zip . && cd ..
+
+      - name: Set up JDK 17 for Android build
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.6'
+
+      - name: Generate Android project and compile signed APK
+        run: |
+          python3 scripts/build_android_apk.py
+          cd android_build
+          gradle assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk ../Win11-Update-Notifier-Android.apk
+
+      - name: Publish APK & Web Bundle to GitHub Releases (Win11 Repo)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="v1.0.0"
+          RELEASE_TITLE="Win11 Update Notifier — Android APK & Discord Suite ($TAG_NAME)"
+          NOTES="### 📱 Download Win11 Update Notifier for Android\n\n- **Direct Android App Installer:** Download **\`Win11-Update-Notifier-Android.apk\`** below and open it on your Android phone to install the standalone app (no Chrome address bar or tabs).\n- **Features Included:**\n  1. Live Windows 11 Release Health Tracker (26H2, 26H1, 24H2, 23H2)\n  2. Dedicated **Updates Since Date** Historical Range Explorer\n  3. Instant **Discord Webhook** & **Android Push (ntfy.sh)** Notification Center\n  4. Automated 6-Hour GitHub Actions Release Checker"
+
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" \
+              Win11-Update-Notifier-Android.apk \
+              Win11-Update-Notifier-Web-Bundle.zip \
+              --clobber
+          else
+            gh release create "$TAG_NAME" \
+              Win11-Update-Notifier-Android.apk \
+              Win11-Update-Notifier-Web-Bundle.zip \
+              --title "$RELEASE_TITLE" \
+              --notes "$NOTES"
+          fi

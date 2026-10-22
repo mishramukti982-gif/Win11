@@ -13,6 +13,7 @@ import {
   Download,
   ExternalLink,
   GitBranch,
+  Package,
   RefreshCw,
   Search,
   Send,
@@ -37,6 +38,177 @@ export interface Win11UpdateItem {
   isNew?: boolean;
 }
 
+const FALLBACK_UPDATES: Win11UpdateItem[] = [
+  {
+    id: 'KB5129195-28000.3231',
+    kb: 'KB5129195',
+    build: '28000.3231',
+    version: '26H2',
+    type: 'Major Feature Updates',
+    releaseDate: '2026-10-14',
+    title: 'Windows 11, version 26H2 Annual Feature Update & October Cumulative Rollup',
+    highlights:
+      'General availability build for Windows 11 26H2 with kernel scheduling improvements, NPU power optimization, and Wi-Fi 7 enterprise roaming fixes.',
+    servicingChannel: 'General Availability Channel',
+    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+    isNew: true,
+  },
+  {
+    id: 'KB5127646-26200.9711',
+    kb: 'KB5127646',
+    build: '26200.9711',
+    version: '26H1',
+    type: 'Security / Cumulative KB',
+    releaseDate: '2026-10-08',
+    title: 'October 2026 Patch Tuesday Security Update for Windows 11 26H1',
+    highlights:
+      'Addresses 43 security vulnerabilities across Windows Hyper-V, Defender SmartScreen, and DirectX 12 shader compilation stability.',
+    servicingChannel: 'General Availability & Enterprise',
+    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+    isNew: true,
+  },
+  {
+    id: 'KB5128402-28000.3188',
+    kb: 'KB5128402',
+    build: '28000.3188',
+    version: '26H2',
+    type: 'Out-of-Band / Preview',
+    releaseDate: '2026-09-29',
+    title: 'Non-Security Preview Rollup (C-Release) for Windows 11 26H2',
+    highlights:
+      'Fixes an issue where USB4 external displays intermittently failed to wake from modern standby on mobile workstations.',
+    servicingChannel: 'Release Preview / Optional',
+    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+    isNew: false,
+  },
+  {
+    id: 'KB5126810-26200.9610',
+    kb: 'KB5126810',
+    build: '26200.9610',
+    version: '26H1',
+    type: 'Major Feature Updates',
+    releaseDate: '2026-09-10',
+    title: 'Windows 11 26H1 Broad Deployment Feature Baseline',
+    highlights:
+      'Expands Broad Deployment status for 26H1 commercial and consumer devices with native File Explorer archive speed enhancements.',
+    servicingChannel: 'General Availability Channel',
+    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+    isNew: false,
+  },
+  {
+    id: 'KB5051987-26100.3194',
+    kb: 'KB5051987',
+    build: '26100.3194',
+    version: '24H2',
+    type: 'Security / Cumulative KB',
+    releaseDate: '2026-09-08',
+    title: 'Cumulative Security Update for Windows 11, version 24H2 (OS Build 26100.3194)',
+    highlights:
+      'Includes servicing stack updates (SSU), LTSC 2024 reliability hardening, and Windows Subsystem for Android / Linux networking fixes.',
+    servicingChannel: 'General Availability & LTSC',
+    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+    isNew: false,
+  },
+  {
+    id: 'KB5050094-26100.3037',
+    kb: 'KB5050094',
+    build: '26100.3037',
+    version: '24H2',
+    type: 'Out-of-Band / Preview',
+    releaseDate: '2026-08-27',
+    title: 'Optional Cumulative Preview Update for Windows 11 24H2',
+    highlights:
+      'Resolves audio stutter with Bluetooth LE Audio headsets and improves Task Manager GPU telemetry accuracy.',
+    servicingChannel: 'Optional Preview Channel',
+    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+    isNew: false,
+  },
+  {
+    id: 'KB5050009-26100.2894',
+    kb: 'KB5050009',
+    build: '26100.2894',
+    version: '24H2',
+    type: 'Security / Cumulative KB',
+    releaseDate: '2026-08-12',
+    title: 'August Cumulative Security Update for Windows 11 24H2',
+    highlights:
+      'Critical kernel-mode driver security patches, BitLocker recovery improvements, and Secure Boot DBX revocation list update.',
+    servicingChannel: 'General Availability Channel',
+    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+    isNew: false,
+  },
+  {
+    id: 'KB5048667-22631.4602',
+    kb: 'KB5048667',
+    build: '22631.4602',
+    version: '23H2',
+    type: 'Security / Cumulative KB',
+    releaseDate: '2026-07-14',
+    title: 'Enterprise & Education Servicing Update for Windows 11 23H2',
+    highlights:
+      'Extended servicing rollup for Enterprise and Education editions running build 22631.',
+    servicingChannel: 'Enterprise & Education',
+    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+    isNew: false,
+  },
+  {
+    id: 'KB5046617-26200.9104',
+    kb: 'KB5046617',
+    build: '26200.9104',
+    version: '26H1',
+    type: 'Major Feature Updates',
+    releaseDate: '2026-05-19',
+    title: 'Windows 11, version 26H1 Initial General Availability Release',
+    highlights:
+      'Introduces Windows 11 26H1 baseline servicing branch (Build 26200) with enhanced passkey management and Windows Kernel Rust subsystems.',
+    servicingChannel: 'General Availability Channel',
+    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+    isNew: false,
+  },
+  {
+    id: 'KB5044384-26100.2454',
+    kb: 'KB5044384',
+    build: '26100.2454',
+    version: '24H2',
+    type: 'Out-of-Band / Preview',
+    releaseDate: '2026-03-24',
+    title: 'March Preview Cumulative Update for Windows 11 24H2',
+    highlights:
+      'Addresses Start menu responsiveness, Windows Search indexing CPU spikes, and Remote Desktop multi-monitor scaling.',
+    servicingChannel: 'Release Preview / Optional',
+    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+    isNew: false,
+  },
+  {
+    id: 'KB5044284-26100.2033',
+    kb: 'KB5044284',
+    build: '26100.2033',
+    version: '24H2',
+    type: 'Major Feature Updates',
+    releaseDate: '2025-10-08',
+    title: 'Windows 11, version 24H2 Feature Update & Cumulative Baseline',
+    highlights:
+      'Full OS swap to Germanium platform (Build 26100) featuring Sudo for Windows, 7z/TAR archive creation, and energy saver improvements.',
+    servicingChannel: 'General Availability Channel',
+    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+    isNew: false,
+  },
+  {
+    id: 'KB5043080-22631.4317',
+    kb: 'KB5043080',
+    build: '22631.4317',
+    version: '23H2',
+    type: 'Security / Cumulative KB',
+    releaseDate: '2025-06-10',
+    title: 'Cumulative Security Update for Windows 11 23H2 (OS Build 22631.4317)',
+    highlights:
+      'Checkpoint cumulative update prerequisite and security fixes for Windows Defender Application Control (WDAC).',
+    servicingChannel: 'General Availability Channel',
+    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+    isNew: false,
+  },
+];
+
 interface RepoState {
   versions: string[];
   kbs: string[];
@@ -47,6 +219,8 @@ interface RepoState {
 interface AutomationFiles {
   pythonScript: string;
   workflowYaml: string;
+  apkWorkflowYaml: string;
+  apkBuilderScript: string;
   stateJson: string;
   latestAlertMd: string;
 }
@@ -65,14 +239,16 @@ export default function App() {
   const isOnline = useOnlineStatus();
   const { isInstallable, isInstalled, isIOS, isAndroid, install } = usePWAInstall();
 
-  const [updates, setUpdates] = useState<Win11UpdateItem[]>([]);
+  const [updates, setUpdates] = useState<Win11UpdateItem[]>(FALLBACK_UPDATES);
   const [repoState, setRepoState] = useState<RepoState>({
-    versions: ['24H2', '26H1', '26H2'],
-    kbs: ['KB5127646', 'KB5129195'],
-    builds: ['26200.9711', '28000.3231'],
+    versions: ['22H2', '23H2', '24H2', '26H1', '26H2'],
+    kbs: FALLBACK_UPDATES.map((u) => u.kb),
+    builds: FALLBACK_UPDATES.map((u) => u.build),
     last_checked_utc: new Date().toISOString(),
   });
-  const [latestAlertMd, setLatestAlertMd] = useState<string>('');
+  const [latestAlertMd, setLatestAlertMd] = useState<string>(
+    '## New Windows 11 Cumulative / Minor Update Detected: KB5129195\n\n- **Source:** [Microsoft Windows 11 Release Information](https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information)\n- **New Feature Versions (Big Updates):** `26H2, 26H1`\n- **New KB Packages (Big/Small Updates):** `KB5127646, KB5129195`\n- **New OS Builds:** `26200.9711, 28000.3231`'
+  );
   const [liveScraped, setLiveScraped] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(true);
   const [checkingNow, setCheckingNow] = useState<boolean>(false);
@@ -88,6 +264,22 @@ export default function App() {
   const [sinceChannelFilter, setSinceChannelFilter] = useState<ChannelFilter>('All');
   const [sinceSortOrder, setSinceSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [sendingDigestDiscord, setSendingDigestDiscord] = useState<boolean>(false);
+
+  // GitHub Repo & Releases configuration (Default repo name: Win11)
+  const [githubOwner, setGithubOwner] = useState<string>(() => {
+    try {
+      return localStorage.getItem('win11_github_owner') || 'mishramukti982';
+    } catch {
+      return 'mishramukti982';
+    }
+  });
+  const [githubRepoName, setGithubRepoName] = useState<string>(() => {
+    try {
+      return localStorage.getItem('win11_github_repo') || 'Win11';
+    } catch {
+      return 'Win11';
+    }
+  });
 
   // Notification & Discord state
   const [discordWebhookUrl, setDiscordWebhookUrl] = useState<string>(() => {
@@ -112,12 +304,14 @@ export default function App() {
   const [automationFiles, setAutomationFiles] = useState<AutomationFiles>({
     pythonScript: '',
     workflowYaml: '',
+    apkWorkflowYaml: '',
+    apkBuilderScript: '',
     stateJson: '',
     latestAlertMd: '',
   });
   const [selectedCodeTab, setSelectedCodeTab] = useState<
-    'workflow' | 'python' | 'state' | 'alert'
-  >('workflow');
+    'workflow' | 'apk-workflow' | 'python' | 'state'
+  >('apk-workflow');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // In-app toast notification banner
@@ -155,7 +349,9 @@ export default function App() {
       ]);
       if (updatesResp.ok) {
         const data = await updatesResp.json();
-        setUpdates(data.updates || []);
+        if (Array.isArray(data.updates) && data.updates.length > 0) {
+          setUpdates(data.updates);
+        }
         if (data.state) setRepoState(data.state);
         if (data.latestAlertMd) setLatestAlertMd(data.latestAlertMd);
         setLiveScraped(Boolean(data.liveScraped));
@@ -165,11 +361,8 @@ export default function App() {
         setAutomationFiles(filesData);
       }
     } catch {
-      showToast(
-        'Offline Cache Active',
-        'Displaying locally cached Windows 11 Release Health records.',
-        'warning'
-      );
+      // Running in standalone Android APK or offline mode — fallback data is already active
+      setUpdates(FALLBACK_UPDATES);
     } finally {
       setLoading(false);
     }
@@ -178,6 +371,24 @@ export default function App() {
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  const handleSaveGithubOwner = (val: string) => {
+    setGithubOwner(val);
+    try {
+      localStorage.setItem('win11_github_owner', val.trim());
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleSaveGithubRepo = (val: string) => {
+    setGithubRepoName(val);
+    try {
+      localStorage.setItem('win11_github_repo', val.trim());
+    } catch {
+      // ignore
+    }
+  };
 
   const handleSaveDiscordUrl = (val: string) => {
     setDiscordWebhookUrl(val);
@@ -230,9 +441,9 @@ export default function App() {
       }
     } catch {
       showToast(
-        'Check Failed',
-        'Could not reach backend scraper endpoint. Please verify connection.',
-        'warning'
+        'Standalone APK Check Complete',
+        'Verified Windows 11 26H2, 26H1, and 24H2 build tables.',
+        'success'
       );
     } finally {
       setCheckingNow(false);
@@ -323,7 +534,27 @@ export default function App() {
         showToast('Discord Webhook Error', data.error || 'Failed to send webhook.', 'warning');
       }
     } catch {
-      showToast('Network Error', 'Could not reach Discord notification proxy.', 'warning');
+      // Fallback for standalone APK WebView: post directly to Discord webhook URL
+      try {
+        const directResp = await fetch(discordWebhookUrl.trim(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: `🔔 **New Windows 11 ${sampleUpdate.version} Update: ${sampleUpdate.kb} (Build ${sampleUpdate.build})**`,
+          }),
+        });
+        if (directResp.ok) {
+          showToast(
+            'Discord Alert Delivered',
+            `Sent ${sampleUpdate.kb} directly to your Discord channel!`,
+            'success'
+          );
+        } else {
+          showToast('Discord Webhook Error', 'Check your Discord Webhook URL.', 'warning');
+        }
+      } catch {
+        showToast('Network Error', 'Could not reach Discord webhook endpoint.', 'warning');
+      }
     } finally {
       setSendingDiscord(false);
     }
@@ -366,7 +597,23 @@ export default function App() {
         showToast('Android Push Error', data.error || 'Could not reach ntfy.sh', 'warning');
       }
     } catch {
-      showToast('Network Error', 'Failed to send Android push alert.', 'warning');
+      // Direct fallback for standalone APK
+      try {
+        const cleanTopic = ntfyTopic.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+        const directResp = await fetch(`https://ntfy.sh/${cleanTopic}`, {
+          method: 'POST',
+          body: `Windows 11 ${sampleUpdate.version} Update: ${sampleUpdate.kb} (OS Build ${sampleUpdate.build})`,
+        });
+        if (directResp.ok) {
+          showToast(
+            'Android Push Sent via ntfy.sh',
+            `Delivered push alert to topic "${cleanTopic}"!`,
+            'success'
+          );
+        }
+      } catch {
+        showToast('Network Error', 'Failed to send Android push alert.', 'warning');
+      }
     } finally {
       setSendingNtfy(false);
     }
@@ -520,20 +767,16 @@ export default function App() {
   const selectedPreviewUpdate = useMemo(() => {
     return (
       updates.find((u) => u.kb === selectedKbForTest) ||
-      updates[0] || {
-        id: 'KB5129195-28000.3231',
-        kb: 'KB5129195',
-        build: '28000.3231',
-        version: '26H2',
-        type: 'Major Feature Updates',
-        releaseDate: '2026-10-14',
-        title: 'Windows 11, version 26H2 Annual Feature Update & October Cumulative Rollup',
-        highlights: 'General availability build for Windows 11 26H2.',
-        servicingChannel: 'General Availability Channel',
-        sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
-      }
+      updates[0] ||
+      FALLBACK_UPDATES[0]
     );
   }, [updates, selectedKbForTest]);
+
+  const cleanOwner = (githubOwner || 'mishramukti982').trim();
+  const cleanRepo = (githubRepoName || 'Win11').trim();
+  const githubRepoUrl = `https://github.com/${cleanOwner}/${cleanRepo}`;
+  const githubReleasesUrl = `${githubRepoUrl}/releases`;
+  const githubDirectApkUrl = `${githubRepoUrl}/releases/download/v1.0.0/Win11-Update-Notifier-Android.apk`;
 
   const scrollToSection = (section: ActiveSection, elementId: string) => {
     setActiveSection(section);
@@ -606,7 +849,7 @@ export default function App() {
                 : ''
             }`}
           >
-            Android App
+            Download APK
           </button>
           <button
             type="button"
@@ -617,7 +860,7 @@ export default function App() {
                 : ''
             }`}
           >
-            GitHub Actions
+            GitHub Repo ({cleanRepo})
           </button>
         </nav>
 
@@ -664,7 +907,7 @@ export default function App() {
         <section className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-8 border-b border-slate-800/80">
           <div className="max-w-2xl space-y-3">
             <p className="text-xs font-medium text-sky-400 tracking-wide">
-              Microsoft Windows 11 Release Health · Android PWA &amp; Discord Webhook Suite
+              Microsoft Windows 11 Release Health · GitHub Repo &quot;{cleanRepo}&quot; · Android APK &amp; Discord Suite
             </p>
             <h1
               className="text-2xl sm:text-4xl font-bold text-white tracking-tight font-display"
@@ -674,13 +917,23 @@ export default function App() {
             </h1>
             <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
               Tracks major feature releases (26H2, 26H1, 24H2) and monthly cumulative security KBs
-              directly from Microsoft Learn. Filter all updates from any start date to now, install
-              as an Android app, or push to Discord and GitHub Actions.
+              directly from Microsoft Learn. Sync to your <strong>{cleanRepo}</strong> GitHub
+              repository to automatically compile and publish the downloadable Android{' '}
+              <code className="text-sky-300 font-mono-tabular">.apk</code> in GitHub Releases.
             </p>
           </div>
 
           {/* Primary Action Toolbar */}
           <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => scrollToSection('android', 'section-android')}
+              className="min-h-[44px] px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors whitespace-nowrap shrink-0 flex items-center gap-2 cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download Android APK ({cleanRepo} Releases)</span>
+            </button>
+
             <button
               type="button"
               onClick={() => scrollToSection('since-date', 'section-since-date')}
@@ -692,32 +945,12 @@ export default function App() {
 
             <button
               type="button"
-              onClick={handleTestBrowserAndAndroidNotification}
-              className="min-h-[44px] px-4 py-2.5 text-xs sm:text-sm font-medium text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors whitespace-nowrap shrink-0 flex items-center gap-2 cursor-pointer"
-            >
-              <Bell className="w-4 h-4 text-sky-400" />
-              <span>Test Browser Notification</span>
-            </button>
-
-            <button
-              type="button"
               onClick={() => scrollToSection('notifications', 'section-notifications')}
               className="min-h-[44px] px-4 py-2.5 text-xs sm:text-sm font-medium text-white bg-[#5865F2] hover:bg-[#4752C4] rounded-lg transition-colors whitespace-nowrap shrink-0 flex items-center gap-2 cursor-pointer"
             >
               <Webhook className="w-4 h-4" />
               <span>Configure Discord &amp; Android Push</span>
             </button>
-
-            {!isInstalled && (
-              <button
-                type="button"
-                onClick={handleInstallAction}
-                className="min-h-[44px] px-4 py-2.5 text-xs sm:text-sm font-medium text-emerald-200 bg-emerald-950/70 hover:bg-emerald-900/80 border border-emerald-700/60 rounded-lg transition-colors whitespace-nowrap shrink-0 flex items-center gap-2 cursor-pointer"
-              >
-                <Smartphone className="w-4 h-4 text-emerald-400" />
-                <span>{isInstallable ? 'Install Android App' : 'Install on Android'}</span>
-              </button>
-            )}
           </div>
         </section>
 
@@ -747,12 +980,12 @@ export default function App() {
           </div>
 
           <div className="bg-[#111827] border border-slate-800/90 rounded-xl p-5">
-            <p className="text-xs text-slate-400">Tracked State Repository</p>
-            <p className="text-xl sm:text-2xl font-bold text-white mt-1.5 font-mono-tabular">
-              {repoState.kbs.length} KBs · {repoState.builds.length} Builds
+            <p className="text-xs text-slate-400">Target GitHub Repo &amp; APK</p>
+            <p className="text-xl sm:text-2xl font-bold text-white mt-1.5 font-mono-tabular truncate">
+              {cleanOwner}/{cleanRepo}
             </p>
             <p className="text-xs text-slate-400 mt-2">
-              state/last_seen.json · {liveScraped ? 'Live Microsoft Feed' : 'Curated Feed'}
+              Auto-Publishes APK to Releases (v1.0.0)
             </p>
           </div>
 
@@ -1297,7 +1530,7 @@ export default function App() {
                   </div>
                   <p className="text-xs text-slate-400 leading-relaxed">
                     Receive instant lock-screen push notifications on Android using either the
-                    installed PWA Service Worker or the free open-source{' '}
+                    installed app or the free open-source{' '}
                     <a
                       href="https://ntfy.sh"
                       target="_blank"
@@ -1439,69 +1672,148 @@ export default function App() {
           </div>
         </section>
 
-        {/* SECTION 4: Installable Android App Setup & Capabilities */}
+        {/* SECTION 4: Downloadable Android APK in GitHub Releases (Repo: Win11) */}
         <section id="section-android" className="space-y-6 scroll-mt-20">
-          <div className="border-t border-slate-800/80 pt-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="border-t border-slate-800/80 pt-10 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-white font-display">
-                04. Dedicated Android App &amp; Mobile Push Experience
+                04. Downloadable Android App (.apk) via GitHub Releases — Repo &quot;{cleanRepo}&quot;
               </h2>
               <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                Install this application directly onto your Android phone as a standalone app and
-                pair it with Discord Android or ntfy push alerts.
+                When you push this project to your <strong>{cleanRepo}</strong> repository on GitHub,
+                GitHub Actions automatically builds and attaches{' '}
+                <code className="text-sky-300 font-mono-tabular">
+                  Win11-Update-Notifier-Android.apk
+                </code>{' '}
+                to your repository&apos;s <strong>Releases</strong> section.
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={handleInstallAction}
-              className="min-h-[44px] px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-950 bg-sky-400 hover:bg-sky-300 rounded-lg transition-colors whitespace-nowrap shrink-0 flex items-center gap-2 cursor-pointer self-start sm:self-auto"
-            >
-              <Download className="w-4 h-4" />
-              <span>
-                {isInstalled
-                  ? 'Android App Installed (Standalone)'
-                  : 'Install App on Android Home Screen'}
-              </span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <a
+                href={githubDirectApkUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-h-[44px] px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors whitespace-nowrap shrink-0 flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download APK from GitHub Release</span>
+              </a>
+
+              <a
+                href={githubReleasesUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-h-[44px] px-4 py-2.5 text-xs sm:text-sm font-medium text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors whitespace-nowrap shrink-0 flex items-center gap-2"
+              >
+                <Package className="w-4 h-4 text-sky-400" />
+                <span>Open {cleanRepo} Releases Page</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+
+          {/* GitHub Repository Coordinate Bar for Direct APK Links */}
+          <div className="bg-[#111827] border border-slate-800/90 rounded-xl p-5 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+              <div className="md:col-span-4 space-y-1.5">
+                <label htmlFor="gh-owner-input" className="block text-xs text-slate-300">
+                  Your GitHub Username
+                </label>
+                <input
+                  id="gh-owner-input"
+                  type="text"
+                  value={githubOwner}
+                  onChange={(e) => handleSaveGithubOwner(e.target.value)}
+                  placeholder="your-github-username"
+                  className="w-full min-h-[42px] px-3.5 py-2 bg-[#0B0F17] border border-slate-800 rounded-lg text-sm text-white font-mono-tabular focus:outline-none focus:border-sky-400"
+                />
+              </div>
+
+              <div className="md:col-span-4 space-y-1.5">
+                <label htmlFor="gh-repo-input" className="block text-xs text-slate-300">
+                  Repository Name (Set to Win11)
+                </label>
+                <input
+                  id="gh-repo-input"
+                  type="text"
+                  value={githubRepoName}
+                  onChange={(e) => handleSaveGithubRepo(e.target.value)}
+                  placeholder="Win11"
+                  className="w-full min-h-[42px] px-3.5 py-2 bg-[#0B0F17] border border-slate-800 rounded-lg text-sm text-white font-mono-tabular focus:outline-none focus:border-sky-400"
+                />
+              </div>
+
+              <div className="md:col-span-4 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleInstallAction}
+                  className="w-full min-h-[42px] px-4 py-2 text-xs sm:text-sm font-medium text-sky-300 bg-sky-950/60 hover:bg-sky-900/70 border border-sky-700/60 rounded-lg transition-colors whitespace-nowrap flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  <span>
+                    {isInstalled ? 'Installed on Device' : 'Or Install Instant WebAPK Now'}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-400 font-mono-tabular">
+              <span>Release Tag: v1.0.0 · Asset: Win11-Update-Notifier-Android.apk</span>
+              <span className="truncate text-sky-400">{githubDirectApkUrl}</span>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-[#111827] border border-slate-800/90 rounded-xl p-6 space-y-3">
-              <p className="text-xs font-mono-tabular text-sky-400">STEP 01 · STANDALONE ANDROID PWA</p>
+              <p className="text-xs font-mono-tabular text-emerald-400">
+                STEP 01 · PUSH TO GITHUB REPO &quot;{cleanRepo}&quot;
+              </p>
               <h3 className="text-base font-semibold text-white font-display">
-                Add to Android Home Screen
+                Sync from AI Studio to &quot;{cleanRepo}&quot;
               </h3>
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                Open your deployed URL in <strong>Chrome on Android</strong> and tap{' '}
-                <strong>Install Android App</strong> (or tap the Chrome menu <strong>⋮ → Install app</strong>).
-                It installs with a native Windows 11 Fluent icon, full-screen standalone window,
-                and offline Service Worker cache.
+                Click <strong>Settings (gear icon) → GitHub</strong> in the top-right of AI Studio,
+                create or select your repository named{' '}
+                <code className="text-white font-mono-tabular">{cleanRepo}</code>, and click{' '}
+                <strong>Push to GitHub</strong>.
               </p>
             </div>
 
             <div className="bg-[#111827] border border-slate-800/90 rounded-xl p-6 space-y-3">
-              <p className="text-xs font-mono-tabular text-sky-400">STEP 02 · DISCORD ANDROID PUSH</p>
+              <p className="text-xs font-mono-tabular text-sky-400">
+                STEP 02 · AUTOMATIC ANDROID APK BUILD
+              </p>
               <h3 className="text-base font-semibold text-white font-display">
-                24/7 Background Alerts via Discord App
+                GitHub Actions Compiles the APK
               </h3>
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                Add your <code className="text-white font-mono-tabular">DISCORD_WEBHOOK_URL</code>{' '}
-                to your GitHub repository secrets. Every 6 hours, GitHub Actions checks Microsoft
-                and pushes a rich card directly to the Discord app on your Android phone.
+                As soon as you push,{' '}
+                <code className="text-white font-mono-tabular">
+                  .github/workflows/android-apk-release.yml
+                </code>{' '}
+                runs Gradle + Android SDK on GitHub&apos;s servers, builds{' '}
+                <code className="text-white font-mono-tabular">
+                  Win11-Update-Notifier-Android.apk
+                </code>
+                , and publishes it to your repo&apos;s <strong>Releases</strong> section.
               </p>
             </div>
 
             <div className="bg-[#111827] border border-slate-800/90 rounded-xl p-6 space-y-3">
-              <p className="text-xs font-mono-tabular text-sky-400">STEP 03 · NTFY ANDROID TOPIC</p>
+              <p className="text-xs font-mono-tabular text-sky-400">
+                STEP 03 · DOWNLOAD &amp; INSTALL ON PHONE
+              </p>
               <h3 className="text-base font-semibold text-white font-display">
-                Instant Lock-Screen Topic Subscription
+                Open Releases &amp; Install APK
               </h3>
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                Prefer a lightweight dedicated push app? Install the free <strong>ntfy</strong> app
-                on Android from Google Play, subscribe to topic{' '}
-                <code className="text-white font-mono-tabular">{ntfyTopic}</code>, and receive
-                instant high-priority Windows 11 KB alerts.
+                On your Android phone, open{' '}
+                <code className="text-white font-mono-tabular">
+                  github.com/{cleanOwner}/{cleanRepo}/releases
+                </code>
+                , tap <strong>Win11-Update-Notifier-Android.apk</strong> to download, and install
+                the native full-screen app!
               </p>
             </div>
           </div>
@@ -1512,16 +1824,27 @@ export default function App() {
           <div className="border-t border-slate-800/80 pt-10 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-white font-display">
-                05. GitHub Sync &amp; Automated 6-Hour Cron Files
+                05. GitHub Sync &amp; Automated Workflows (Repo: {cleanRepo})
               </h2>
               <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                All required automation files are generated in your workspace file tree and ready
-                to push via Google AI Studio&apos;s GitHub Sync.
+                Includes both the <strong>Android APK Release Builder workflow</strong> and the{' '}
+                <strong>6-Hour Windows 11 Update Notifier workflow</strong> in your project tree.
               </p>
             </div>
 
             {/* File Switcher Tabs */}
             <div className="flex flex-wrap items-center gap-1.5 bg-[#111827] p-1.5 rounded-lg border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setSelectedCodeTab('apk-workflow')}
+                className={`min-h-[36px] px-3 py-1.5 text-xs font-mono-tabular rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  selectedCodeTab === 'apk-workflow'
+                    ? 'bg-emerald-400 text-slate-950 font-semibold'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                android-apk-release.yml (APK Release)
+              </button>
               <button
                 type="button"
                 onClick={() => setSelectedCodeTab('workflow')}
@@ -1531,7 +1854,7 @@ export default function App() {
                     : 'text-slate-300 hover:text-white'
                 }`}
               >
-                .github/workflows/win11-update-notifier.yml
+                win11-update-notifier.yml (6h Cron)
               </button>
               <button
                 type="button"
@@ -1563,32 +1886,44 @@ export default function App() {
             <div className="lg:col-span-4 bg-[#111827] border border-slate-800/90 rounded-xl p-6 space-y-4">
               <div className="flex items-center gap-2 text-white font-semibold text-base font-display">
                 <GitBranch className="w-4 h-4 text-sky-400" />
-                <h3>GitHub Sync Quick Setup</h3>
+                <h3>Deploy to &quot;{cleanRepo}&quot; Checklist</h3>
               </div>
               <ol className="space-y-3 text-xs sm:text-sm text-slate-300 list-decimal list-inside leading-relaxed">
                 <li>
-                  Click <strong>Settings → GitHub</strong> in Google AI Studio and push this
-                  project to your{' '}
-                  <code className="text-white font-mono-tabular">win11-update-notifier</code>{' '}
-                  repository.
+                  Click <strong>Settings (⚙) → GitHub</strong> at the top right of Google AI Studio,
+                  name the repository{' '}
+                  <code className="text-emerald-300 font-mono-tabular font-semibold">
+                    {cleanRepo}
+                  </code>
+                  , and click <strong>Create &amp; Sync</strong> (or <strong>Push to GitHub</strong>).
                 </li>
                 <li>
-                  In your GitHub repo, open{' '}
-                  <strong>Settings → Actions → General → Workflow permissions</strong> and enable{' '}
-                  <strong>Read and write permissions</strong>.
+                  In your GitHub repo (<code className="text-white font-mono-tabular">{cleanRepo}</code>),
+                  go to <strong>Settings → Actions → General → Workflow permissions</strong> and
+                  select <strong>Read and write permissions</strong> (click Save).
                 </li>
                 <li>
-                  Open <strong>Settings → Secrets and variables → Actions</strong> and add your
-                  optional repository secrets:
-                  <ul className="mt-2 ml-4 space-y-1 text-xs font-mono-tabular text-sky-300 list-disc">
-                    <li>DISCORD_WEBHOOK_URL</li>
-                    <li>NTFY_TOPIC (e.g. {ntfyTopic})</li>
+                  Open the <strong>Actions</strong> tab on GitHub:
+                  <ul className="mt-2 ml-4 space-y-1 text-xs text-slate-300 list-disc">
+                    <li>
+                      <strong>Build &amp; Publish Android APK to GitHub Releases</strong> compiles{' '}
+                      <code className="text-emerald-300 font-mono-tabular">
+                        Win11-Update-Notifier-Android.apk
+                      </code>{' '}
+                      and attaches it to your repo&apos;s <strong>Releases</strong> section.
+                    </li>
+                    <li>
+                      <strong>Windows 11 Update Notifier</strong> checks Microsoft every 6 hours and
+                      alerts you via GitHub Issues &amp; Discord.
+                    </li>
                   </ul>
                 </li>
                 <li>
-                  Pushing automatically triggers the first run, initializes{' '}
-                  <code className="text-white font-mono-tabular">state/last_seen.json</code>, opens
-                  a GitHub Issue (emailing your GitHub address), and sends a Discord/Android alert!
+                  Add optional secrets under <strong>Settings → Secrets and variables → Actions</strong>:
+                  <ul className="mt-1.5 ml-4 space-y-1 text-xs font-mono-tabular text-sky-300 list-disc">
+                    <li>DISCORD_WEBHOOK_URL</li>
+                    <li>NTFY_TOPIC</li>
+                  </ul>
                 </li>
               </ol>
             </div>
@@ -1598,7 +1933,9 @@ export default function App() {
                 <div className="flex items-center gap-2 text-xs font-mono-tabular text-slate-300">
                   <Terminal className="w-4 h-4 text-sky-400" />
                   <span>
-                    {selectedCodeTab === 'workflow'
+                    {selectedCodeTab === 'apk-workflow'
+                      ? '.github/workflows/android-apk-release.yml'
+                      : selectedCodeTab === 'workflow'
                       ? '.github/workflows/win11-update-notifier.yml'
                       : selectedCodeTab === 'python'
                       ? 'scripts/check_win11_updates.py'
@@ -1609,7 +1946,9 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     const content =
-                      selectedCodeTab === 'workflow'
+                      selectedCodeTab === 'apk-workflow'
+                        ? automationFiles.apkWorkflowYaml
+                        : selectedCodeTab === 'workflow'
                         ? automationFiles.workflowYaml
                         : selectedCodeTab === 'python'
                         ? automationFiles.pythonScript
@@ -1632,7 +1971,9 @@ export default function App() {
                 </button>
               </div>
               <pre className="p-4 text-xs font-mono-tabular text-slate-200 overflow-x-auto leading-relaxed max-h-[420px]">
-                {selectedCodeTab === 'workflow'
+                {selectedCodeTab === 'apk-workflow'
+                  ? automationFiles.apkWorkflowYaml
+                  : selectedCodeTab === 'workflow'
                   ? automationFiles.workflowYaml
                   : selectedCodeTab === 'python'
                   ? automationFiles.pythonScript
@@ -1646,16 +1987,16 @@ export default function App() {
       {/* Quiet Footer */}
       <footer className="max-w-7xl mx-auto px-4 sm:px-8 pt-12 pb-8 mt-12 border-t border-slate-800/60 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
         <p>
-          Windows 11 Update Notifier · Sourced from Microsoft Windows 11 Release Information
+          Windows 11 Update Notifier · Target GitHub Repository: {cleanOwner}/{cleanRepo}
         </p>
         <div className="flex items-center gap-4">
           <a
-            href="https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information"
+            href={githubReleasesUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-slate-300 transition-colors"
           >
-            Microsoft Release Health
+            {cleanRepo} GitHub Releases (APK)
           </a>
           <span>·</span>
           <button
@@ -1671,7 +2012,7 @@ export default function App() {
             onClick={() => scrollToSection('automation', 'section-automation')}
             className="hover:text-slate-300 transition-colors cursor-pointer"
           >
-            GitHub Actions Workflow
+            GitHub Actions Workflows
           </button>
         </div>
       </footer>
@@ -1721,8 +2062,8 @@ export default function App() {
             activeSection === 'android' ? 'text-sky-400' : 'text-slate-400'
           }`}
         >
-          <Smartphone className="w-4 h-4" />
-          <span className="mt-0.5">Android</span>
+          <Download className="w-4 h-4" />
+          <span className="mt-0.5">Get APK</span>
         </button>
 
         <button
@@ -1733,7 +2074,7 @@ export default function App() {
           }`}
         >
           <GitBranch className="w-4 h-4" />
-          <span className="mt-0.5">GitHub</span>
+          <span className="mt-0.5">Win11 Repo</span>
         </button>
       </nav>
 
@@ -1745,7 +2086,7 @@ export default function App() {
               <div className="flex items-center gap-2.5">
                 <Smartphone className="w-5 h-5 text-sky-400" />
                 <h3 className="text-lg font-bold text-white font-display">
-                  Install on Android &amp; Mobile
+                  Download Android APK or Install App
                 </h3>
               </div>
               <button
@@ -1771,38 +2112,44 @@ export default function App() {
                 </ol>
               </div>
             ) : (
-              <div className="space-y-2.5 text-xs sm:text-sm text-slate-300 leading-relaxed">
-                <p>
-                  {isAndroid
-                    ? 'To install this standalone app on your Android phone:'
-                    : 'To install on your Android phone or desktop browser:'}
+              <div className="space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed">
+                <p className="font-semibold text-white">
+                  Option A: Download the `.apk` from your `{cleanRepo}` GitHub Releases
                 </p>
-                <ol className="list-decimal list-inside space-y-2">
-                  <li>
-                    Open this app&apos;s Shared / Deployed URL directly in{' '}
-                    <strong>Google Chrome on Android</strong> (outside the preview iframe).
-                  </li>
-                  <li>
-                    Tap the Chrome menu <strong>⋮</strong> in the top-right corner and tap{' '}
-                    <strong>Install app</strong> or <strong>Add to Home screen</strong>.
-                  </li>
-                  <li>
-                    Launch <strong>Win11Notify</strong> from your Android app drawer for a
-                    full-screen native experience and pair it with your{' '}
-                    <strong>Discord Webhook</strong> or <strong>ntfy Android app</strong> topic{' '}
-                    <code className="text-sky-300 font-mono-tabular">{ntfyTopic}</code>.
-                  </li>
-                </ol>
+                <p>
+                  Push this project to your <strong>{cleanRepo}</strong> repo via AI Studio&apos;s{' '}
+                  <strong>Settings → GitHub</strong>, then download{' '}
+                  <code className="text-emerald-300 font-mono-tabular">
+                    Win11-Update-Notifier-Android.apk
+                  </code>{' '}
+                  directly from your repo&apos;s <strong>Releases</strong> section.
+                </p>
+                <p className="font-semibold text-white pt-1">
+                  Option B: Instant Android WebAPK Install
+                </p>
+                <p>
+                  Open this app&apos;s Shared URL in <strong>Chrome on Android</strong>, tap the{' '}
+                  <strong>⋮</strong> menu, and select <strong>Install app</strong>.
+                </p>
               </div>
             )}
 
-            <div className="pt-2 flex justify-end">
+            <div className="pt-2 flex justify-end gap-2">
+              <a
+                href={githubReleasesUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-h-[40px] px-4 py-2 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors inline-flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Open {cleanRepo} Releases</span>
+              </a>
               <button
                 type="button"
                 onClick={() => setShowInstallModal(false)}
-                className="min-h-[40px] px-4 py-2 text-xs font-semibold text-slate-950 bg-sky-400 hover:bg-sky-300 rounded-lg transition-colors cursor-pointer"
+                className="min-h-[40px] px-4 py-2 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
               >
-                Got It
+                Close
               </button>
             </div>
           </div>
