@@ -1,7 +1,9 @@
-## New Windows 11 Major Feature Update Detected: KB5129242
+## Security / Cumulative Update Detected: KB5134134
 
+- **Alert Priority:** `HIGH (Security / Cumulative — Impacts WUB Risk)`
 - **Source:** [Microsoft Windows 11 Release Information](https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information)
-- **Detected At (UTC):** `2026-10-22 09:14 UTC`
-- **New Feature Versions (Big Updates):** `21H2, 25H2`
-- **New KB Packages (Big/Small Updates):** `KB5121767, KB5122880, KB5124006, KB5124008, KB5124010, KB5124012, KB5126653, KB5127648, KB5129194, KB5129242`
-- **New OS Builds:** `28000.2179, 28000.2269, 28000.2340, 28000.2525, 28000.2608, 28000.2704, 28000.2804, 28000.2954, 28000.2956, 28000.3086`
+- **Detected At (UTC):** `2026-10-27 00:36 UTC`
+- **New Security / Cumulative KBs:** `KB5134130, KB5134133, KB5134134`
+- **New Optional Preview KBs:** `None`
+- **New Feature Versions:** `None`
+- **New OS Builds:** `22631.7654, 26100.9725, 26200.9725, 28000.3237`
