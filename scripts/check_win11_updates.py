@@ -20,9 +20,11 @@ def fetch_html(url: str) -> str:
 
 
 def parse_updates(html: str) -> dict:
-    # Extract KB numbers (e.g. KB5127646) and OS Builds (e.g. 26200.9711, 28000.3231)
+    # Extract KB numbers (e.g. KB5132061, KB5132059, KB5131087, KB5127936) and OS Builds (including 26300 for 26H2)
     kbs = sorted(set(re.findall(r"KB\d{7}", html)))
-    builds = sorted(set(re.findall(r"\b(?:22000|22621|22631|26100|26200|28000)\.\d{3,5}\b", html)))
+    builds = sorted(
+        set(re.findall(r"\b(?:22000|22621|22631|26100|26200|26300|28000)\.\d{3,5}\b", html))
+    )
     versions = sorted(set(re.findall(r"\b2[1-9]H[12]\b", html)))
 
     # Classify KBs by inspecting surrounding table row HTML for Preview/Optional vs Security/Cumulative

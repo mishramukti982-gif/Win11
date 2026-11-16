@@ -20,7 +20,7 @@ export interface Win11UpdateItem {
   id: string;
   kb: string;
   build: string;
-  version: '26H2' | '26H1' | '24H2' | '23H2' | '22H2';
+  version: string;
   type: 'Major Feature Updates' | 'Security / Cumulative KB' | 'Out-of-Band / Preview';
   releaseDate: string;
   title: string;
@@ -28,176 +28,173 @@ export interface Win11UpdateItem {
   servicingChannel: string;
   sourceUrl: string;
   isNew?: boolean;
+  supersededBy?: string;
+  includesPreviewKb?: string;
 }
 
 const CURATED_UPDATES: Win11UpdateItem[] = [
   {
-    id: 'KB5129195-28000.3231',
-    kb: 'KB5129195',
-    build: '28000.3231',
-    version: '26H2',
-    type: 'Major Feature Updates',
-    releaseDate: '2026-10-14',
-    title: 'Windows 11, version 26H2 Annual Feature Update & October Cumulative Rollup',
+    id: 'KB5132061-26300.9974',
+    kb: 'KB5132061',
+    build: '26300.9974 · 26200.9974 · 26100.9974',
+    version: '26H2, 25H2 & 24H2',
+    type: 'Security / Cumulative KB',
+    releaseDate: '2026-11-10',
+    title: 'November 2026 Patch Tuesday Cumulative Security Update (26H2, 25H2 & 24H2)',
     highlights:
-      'General availability build for Windows 11 26H2 with kernel scheduling improvements, NPU power optimization, and Wi-Fi 7 enterprise roaming fixes.',
-    servicingChannel: 'General Availability Channel',
-    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+      'Mandatory November 2026 security patches for Windows 11 26H2, 25H2, and 24H2. Fixes USB Audio 1.0 issues, enables Memory Integrity on more systems, and includes every change from the October 28 optional update (KB5127936).',
+    servicingChannel: 'General Availability (Mandatory B-Release)',
+    sourceUrl: 'https://support.microsoft.com/help/5132061',
     isNew: true,
+    includesPreviewKb: 'KB5127936 (Released 2026-10-28)',
   },
   {
-    id: 'KB5127646-26200.9711',
-    kb: 'KB5127646',
-    build: '26200.9711',
+    id: 'KB5132059-28000.3501',
+    kb: 'KB5132059',
+    build: '28000.3501',
     version: '26H1',
     type: 'Security / Cumulative KB',
-    releaseDate: '2026-10-08',
-    title: 'October 2026 Patch Tuesday Security Update for Windows 11 26H1',
+    releaseDate: '2026-11-10',
+    title: 'November 2026 Patch Tuesday Cumulative Security Update for Windows 11 26H1',
     highlights:
-      'Addresses 43 security vulnerabilities across Windows Hyper-V, Defender SmartScreen, and DirectX 12 shader compilation stability.',
-    servicingChannel: 'General Availability & Enterprise',
-    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+      'Mandatory November 2026 security update for Windows 11 26H1 (OS Build 28000.3501). Includes security patches, Secure Boot certificate updates, and fixes printer error 87.',
+    servicingChannel: 'General Availability (Mandatory B-Release)',
+    sourceUrl: 'https://support.microsoft.com/help/5132059',
     isNew: true,
   },
   {
-    id: 'KB5128402-28000.3188',
-    kb: 'KB5128402',
-    build: '28000.3188',
-    version: '26H2',
+    id: 'KB5131087-22631.7711',
+    kb: 'KB5131087',
+    build: '22631.7711',
+    version: '23H2',
+    type: 'Security / Cumulative KB',
+    releaseDate: '2026-11-10',
+    title: 'November 2026 Patch Tuesday Cumulative Security Update for Windows 11 23H2 (Final)',
+    highlights:
+      'Mandatory final November 2026 security update for Windows 11 version 23H2 (Enterprise & Education editions, OS Build 22631.7711). Includes November vulnerability fixes and printing stability repairs.',
+    servicingChannel: 'Enterprise & Education (Mandatory B-Release)',
+    sourceUrl: 'https://support.microsoft.com/help/5131087',
+    isNew: true,
+  },
+  {
+    id: 'KB5127936-26300.9818',
+    kb: 'KB5127936',
+    build: '26300.9818 · 26200.9818',
+    version: '26H2 & 25H2',
     type: 'Out-of-Band / Preview',
-    releaseDate: '2026-09-29',
-    title: 'Non-Security Preview Rollup (C-Release) for Windows 11 26H2',
+    releaseDate: '2026-10-28',
+    title: 'October 28, 2026 Optional Non-Security Preview Update (26H2 & 25H2)',
     highlights:
-      'Fixes an issue where USB4 external displays intermittently failed to wake from modern standby on mobile workstations.',
-    servicingChannel: 'Release Preview / Optional',
-    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+      'Optional C-release preview introducing context menu improvements and adaptive hibernation adjustments. All changes from KB5127936 are already included inside the Nov 10 mandatory update KB5132061.',
+    servicingChannel: 'Optional Preview Channel (C-Release)',
+    sourceUrl: 'https://support.microsoft.com/help/5127936',
     isNew: false,
+    supersededBy: 'KB5132061 (2026-11-10 Patch Tuesday)',
   },
   {
-    id: 'KB5126810-26200.9610',
-    kb: 'KB5126810',
-    build: '26200.9610',
+    id: 'KB5127648-26300.9711',
+    kb: 'KB5127648',
+    build: '26300.9711 · 26200.9711 · 26100.9711',
+    version: '26H2, 25H2 & 24H2',
+    type: 'Security / Cumulative KB',
+    releaseDate: '2026-10-13',
+    title: 'October 2026 Patch Tuesday Cumulative Security Update (26H2, 25H2 & 24H2)',
+    highlights:
+      'Mandatory October 13, 2026 security rollup for 26H2, 25H2, and 24H2 (also final standard monthly update for 24H2 Home/Pro). Fixes gaming mouse stutters, Windows Hello fingerprint issues, and File Explorer PDF previews.',
+    servicingChannel: 'General Availability (Mandatory B-Release)',
+    sourceUrl: 'https://support.microsoft.com/help/5127648',
+    isNew: false,
+    supersededBy: 'KB5132061 (2026-11-10 Patch Tuesday)',
+  },
+  {
+    id: 'KB5127646-28000.3231',
+    kb: 'KB5127646',
+    build: '28000.3231',
     version: '26H1',
-    type: 'Major Feature Updates',
-    releaseDate: '2026-09-10',
-    title: 'Windows 11 26H1 Broad Deployment Feature Baseline',
+    type: 'Security / Cumulative KB',
+    releaseDate: '2026-10-13',
+    title: 'October 2026 Patch Tuesday Cumulative Security Update for Windows 11 26H1',
     highlights:
-      'Expands Broad Deployment status for 26H1 commercial and consumer devices with native File Explorer archive speed enhancements.',
-    servicingChannel: 'General Availability Channel',
-    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+      'Mandatory October 13, 2026 security update for Windows 11 26H1 (OS Build 28000.3231) addressing kernel and hypervisor vulnerabilities.',
+    servicingChannel: 'General Availability (Mandatory B-Release)',
+    sourceUrl: 'https://support.microsoft.com/help/5127646',
     isNew: false,
+    supersededBy: 'KB5132059 (2026-11-10 Patch Tuesday)',
   },
   {
-    id: 'KB5051987-26100.3194',
-    kb: 'KB5051987',
-    build: '26100.3194',
-    version: '24H2',
+    id: 'KB5126653-22631.7652',
+    kb: 'KB5126653',
+    build: '22631.7652',
+    version: '23H2',
+    type: 'Security / Cumulative KB',
+    releaseDate: '2026-10-13',
+    title: 'October 2026 Patch Tuesday Cumulative Security Update for Windows 11 23H2',
+    highlights:
+      'Mandatory October 13, 2026 cumulative security rollup for Windows 11 23H2 (OS Build 22631.7652).',
+    servicingChannel: 'Enterprise & Education (Mandatory B-Release)',
+    sourceUrl: 'https://support.microsoft.com/help/5126653',
+    isNew: false,
+    supersededBy: 'KB5131087 (2026-11-10 Patch Tuesday)',
+  },
+  {
+    id: 'KB5124010-26300.9550',
+    kb: 'KB5124010',
+    build: '26300.9550 · 26200.9550 · 26100.9550',
+    version: '26H2, 25H2 & 24H2',
+    type: 'Out-of-Band / Preview',
+    releaseDate: '2026-09-22',
+    title: 'September 22, 2026 Optional Preview Update (26H2, 25H2 & 24H2)',
+    highlights:
+      'Optional non-security preview update (OS Builds 26300.9550, 26200.9550, 26100.9550). Fully superseded by October and November cumulative security updates.',
+    servicingChannel: 'Optional Preview Channel (C-Release)',
+    sourceUrl: 'https://support.microsoft.com/help/5124010',
+    isNew: false,
+    supersededBy: 'KB5132061 (2026-11-10 Patch Tuesday)',
+  },
+  {
+    id: 'KB5129195-OOB',
+    kb: 'KB5129195',
+    build: '28000.3010 · 26200.9480',
+    version: '26H1, 25H2 & 24H2',
+    type: 'Security / Cumulative KB',
+    releaseDate: '2026-09-14',
+    title: 'September 14, 2026 Out-of-Band (OOB) Hotfix Update',
+    highlights:
+      'Out-of-band cumulative hotfix remediating Remote Desktop Services, Hyper-V Linux VM host folder shares, and USB audio issues introduced in early September.',
+    servicingChannel: 'Out-of-Band Hotfix',
+    sourceUrl: 'https://support.microsoft.com/help/5129195',
+    isNew: false,
+    supersededBy: 'KB5132061 / KB5132059 (2026-11-10 Patch Tuesday)',
+  },
+  {
+    id: 'KB5124008-26200.9445',
+    kb: 'KB5124008',
+    build: '26200.9445 · 26100.9445',
+    version: '25H2 & 24H2',
     type: 'Security / Cumulative KB',
     releaseDate: '2026-09-08',
-    title: 'Cumulative Security Update for Windows 11, version 24H2 (OS Build 26100.3194)',
+    title: 'September 2026 Patch Tuesday Cumulative Security Update (25H2 & 24H2)',
     highlights:
-      'Includes servicing stack updates (SSU), LTSC 2024 reliability hardening, and Windows Subsystem for Android / Linux networking fixes.',
-    servicingChannel: 'General Availability & LTSC',
-    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+      'Mandatory September 8, 2026 cumulative security update addressing CVE-2026-81963 (Windows Update Stack Elevation of Privilege) and system stability fixes.',
+    servicingChannel: 'General Availability (Mandatory B-Release)',
+    sourceUrl: 'https://support.microsoft.com/help/5124008',
     isNew: false,
+    supersededBy: 'KB5132061 (2026-11-10 Patch Tuesday)',
   },
   {
-    id: 'KB5050094-26100.3037',
-    kb: 'KB5050094',
-    build: '26100.3037',
-    version: '24H2',
-    type: 'Out-of-Band / Preview',
-    releaseDate: '2026-08-27',
-    title: 'Optional Cumulative Preview Update for Windows 11 24H2',
-    highlights:
-      'Resolves audio stutter with Bluetooth LE Audio headsets and improves Task Manager GPU telemetry accuracy.',
-    servicingChannel: 'Optional Preview Channel',
-    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
-    isNew: false,
-  },
-  {
-    id: 'KB5050009-26100.2894',
-    kb: 'KB5050009',
-    build: '26100.2894',
-    version: '24H2',
-    type: 'Security / Cumulative KB',
-    releaseDate: '2026-08-12',
-    title: 'August Cumulative Security Update for Windows 11 24H2',
-    highlights:
-      'Critical kernel-mode driver security patches, BitLocker recovery improvements, and Secure Boot DBX revocation list update.',
-    servicingChannel: 'General Availability Channel',
-    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
-    isNew: false,
-  },
-  {
-    id: 'KB5048667-22631.4602',
-    kb: 'KB5048667',
-    build: '22631.4602',
-    version: '23H2',
-    type: 'Security / Cumulative KB',
-    releaseDate: '2026-07-14',
-    title: 'Enterprise & Education Servicing Update for Windows 11 23H2',
-    highlights:
-      'Extended servicing rollup for Enterprise and Education editions running build 22631.',
-    servicingChannel: 'Enterprise & Education',
-    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
-    isNew: false,
-  },
-  {
-    id: 'KB5046617-26200.9104',
-    kb: 'KB5046617',
-    build: '26200.9104',
+    id: 'KB5124012-28000.2954',
+    kb: 'KB5124012',
+    build: '28000.2954',
     version: '26H1',
-    type: 'Major Feature Updates',
-    releaseDate: '2026-05-19',
-    title: 'Windows 11, version 26H1 Initial General Availability Release',
-    highlights:
-      'Introduces Windows 11 26H1 baseline servicing branch (Build 26200) with enhanced passkey management and Windows Kernel Rust subsystems.',
-    servicingChannel: 'General Availability Channel',
-    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
-    isNew: false,
-  },
-  {
-    id: 'KB5044384-26100.2454',
-    kb: 'KB5044384',
-    build: '26100.2454',
-    version: '24H2',
-    type: 'Out-of-Band / Preview',
-    releaseDate: '2026-03-24',
-    title: 'March Preview Cumulative Update for Windows 11 24H2',
-    highlights:
-      'Addresses Start menu responsiveness, Windows Search indexing CPU spikes, and Remote Desktop multi-monitor scaling.',
-    servicingChannel: 'Release Preview / Optional',
-    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
-    isNew: false,
-  },
-  {
-    id: 'KB5044284-26100.2033',
-    kb: 'KB5044284',
-    build: '26100.2033',
-    version: '24H2',
-    type: 'Major Feature Updates',
-    releaseDate: '2025-10-08',
-    title: 'Windows 11, version 24H2 Feature Update & Cumulative Baseline',
-    highlights:
-      'Full OS swap to Germanium platform (Build 26100) featuring Sudo for Windows, 7z/TAR archive creation, and energy saver improvements.',
-    servicingChannel: 'General Availability Channel',
-    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
-    isNew: false,
-  },
-  {
-    id: 'KB5043080-22631.4317',
-    kb: 'KB5043080',
-    build: '22631.4317',
-    version: '23H2',
     type: 'Security / Cumulative KB',
-    releaseDate: '2025-06-10',
-    title: 'Cumulative Security Update for Windows 11 23H2 (OS Build 22631.4317)',
+    releaseDate: '2026-09-08',
+    title: 'September 2026 Patch Tuesday Cumulative Security Update for Windows 11 26H1',
     highlights:
-      'Checkpoint cumulative update prerequisite and security fixes for Windows Defender Application Control (WDAC).',
-    servicingChannel: 'General Availability Channel',
-    sourceUrl: 'https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information',
+      'Mandatory September 8, 2026 security update for Windows 11 version 26H1 (OS Build 28000.2954).',
+    servicingChannel: 'General Availability (Mandatory B-Release)',
+    sourceUrl: 'https://support.microsoft.com/help/5124012',
     isNew: false,
+    supersededBy: 'KB5132059 (2026-11-10 Patch Tuesday)',
   },
 ];
 
@@ -224,22 +221,18 @@ function createWin11PngBuffer(size: number, maskable: boolean): Buffer {
 
       if (inSquare && !inGapX && !inGapY) {
         if (x < half && y < half) {
-          // Top-left pane: #38BDF8
           r = 56;
           g = 189;
           b = 248;
         } else if (x >= half && y < half) {
-          // Top-right pane: #0284C7
           r = 2;
           g = 132;
           b = 199;
         } else if (x < half && y >= half) {
-          // Bottom-left pane: #0284C7
           r = 2;
           g = 132;
           b = 199;
         } else {
-          // Bottom-right pane: #5865F2 (Discord accent pane)
           r = 88;
           g = 101;
           b = 242;
@@ -283,8 +276,8 @@ function createWin11PngBuffer(size: number, maskable: boolean): Buffer {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(size, 0);
   ihdr.writeUInt32BE(size, 4);
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 6; // RGBA
+  ihdr[8] = 8;
+  ihdr[9] = 6;
   ihdr[10] = 0;
   ihdr[11] = 0;
   ihdr[12] = 0;
@@ -324,9 +317,9 @@ function readStateFile() {
     // ignore parse errors
   }
   return {
-    versions: ['22H2', '23H2', '24H2', '26H1', '26H2'],
-    kbs: ['KB5127646', 'KB5129195'],
-    builds: ['26200.9711', '28000.3231'],
+    versions: ['22H2', '23H2', '24H2', '25H2', '26H1', '26H2'],
+    kbs: ['KB5127936', 'KB5131087', 'KB5132059', 'KB5132061'],
+    builds: ['22631.7711', '26100.9974', '26200.9974', '26300.9974', '28000.3501'],
     last_checked_utc: new Date().toISOString(),
   };
 }
@@ -362,61 +355,77 @@ async function scrapeMicrosoftReleaseHealth(): Promise<{
     const html = await resp.text();
     const kbs = Array.from(new Set(html.match(/KB\d{7}/g) || [])).sort();
     const builds = Array.from(
-      new Set(html.match(/\b(?:22000|22621|22631|26100|26200|28000)\.\d{3,5}\b/g) || [])
+      new Set(html.match(/\b(?:22000|22621|22631|26100|26200|26300|28000)\.\d{3,5}\b/g) || [])
     ).sort();
     const versions = Array.from(new Set(html.match(/\b2[1-9]H[12]\b/g) || [])).sort();
 
-    // Extract table rows from Microsoft Release Health HTML to enrich live KBs
+    // Extract ALL table rows from Microsoft Release Health HTML (no 10-row cap)
     const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
     const liveItems: Win11UpdateItem[] = [];
     const seenIds = new Set(CURATED_UPDATES.map((u) => u.kb));
 
     let match: RegExpExecArray | null;
-    while ((match = rowRegex.exec(html)) !== null && liveItems.length < 10) {
+    while ((match = rowRegex.exec(html)) !== null) {
       const rowHtml = match[1];
       const kbMatch = rowHtml.match(/KB\d{7}/);
-      const buildMatch = rowHtml.match(/\b(22000|22621|22631|26100|26200|28000)\.\d{3,5}\b/);
+      const buildMatches = rowHtml.match(
+        /\b(?:22000|22621|22631|26100|26200|26300|28000)\.\d{3,5}\b/g
+      );
       const dateMatch = rowHtml.match(/\b202\d-\d{2}-\d{2}\b/);
 
-      if (kbMatch && buildMatch && !seenIds.has(kbMatch[0])) {
+      if (kbMatch && buildMatches && dateMatch && !seenIds.has(kbMatch[0])) {
         seenIds.add(kbMatch[0]);
-        const buildStr = buildMatch[0];
-        let ver: Win11UpdateItem['version'] = '24H2';
-        if (buildStr.startsWith('28000')) ver = '26H2';
-        else if (buildStr.startsWith('26200')) ver = '26H1';
-        else if (buildStr.startsWith('26100')) ver = '24H2';
-        else if (buildStr.startsWith('22631')) ver = '23H2';
-        else if (buildStr.startsWith('22621')) ver = '22H2';
+        const uniqueBuilds = Array.from(new Set(buildMatches));
+        const buildStr = uniqueBuilds.join(' · ');
 
-        const isPreview = /preview|optional|out-of-band/i.test(rowHtml);
+        const verParts: string[] = [];
+        if (uniqueBuilds.some((b) => b.startsWith('26300'))) verParts.push('26H2');
+        if (uniqueBuilds.some((b) => b.startsWith('26200'))) verParts.push('25H2');
+        if (uniqueBuilds.some((b) => b.startsWith('26100'))) verParts.push('24H2');
+        if (uniqueBuilds.some((b) => b.startsWith('28000'))) verParts.push('26H1');
+        if (uniqueBuilds.some((b) => b.startsWith('22631'))) verParts.push('23H2');
+        if (uniqueBuilds.some((b) => b.startsWith('22621'))) verParts.push('22H2');
+        const verLabel = verParts.length > 0 ? verParts.join(', ') : '26H2 / 25H2 / 24H2';
+
+        const isPreview = /preview|optional|non-security|c-release|d-release/i.test(rowHtml);
         liveItems.push({
-          id: `${kbMatch[0]}-${buildStr}`,
+          id: `${kbMatch[0]}-${uniqueBuilds[0]}`,
           kb: kbMatch[0],
           build: buildStr,
-          version: ver,
+          version: verLabel,
           type: isPreview ? 'Out-of-Band / Preview' : 'Security / Cumulative KB',
-          releaseDate: dateMatch ? dateMatch[0] : new Date().toISOString().slice(0, 10),
-          title: `Microsoft Release Health Package ${kbMatch[0]} (Build ${buildStr})`,
-          highlights: `Live-parsed Windows 11 servicing update from Microsoft's official Release Information table for version ${ver}.`,
-          servicingChannel: 'General Availability Channel',
+          releaseDate: dateMatch[0],
+          title: `Windows 11 ${ isPreview ? 'Optional Preview Update' : 'Cumulative Security Update' } ${kbMatch[0]} (${verLabel})`,
+          highlights: `Official Microsoft Windows 11 Release Health package for version ${verLabel} (OS Build ${buildStr}).`,
+          servicingChannel: isPreview
+            ? 'Optional Preview Channel'
+            : 'General Availability (B-Release)',
           sourceUrl: `https://support.microsoft.com/help/${kbMatch[0].replace('KB', '')}`,
-          isNew: false,
+          isNew: dateMatch[0] >= '2026-11-01',
         });
       }
     }
 
-    const combined = [...CURATED_UPDATES, ...liveItems];
+    const combined = [...CURATED_UPDATES, ...liveItems].sort((a, b) =>
+      b.releaseDate.localeCompare(a.releaseDate)
+    );
     return {
       liveScraped: true,
-      discoveredVersions: Array.from(new Set([...versions, '26H2', '26H1', '24H2'])).sort(),
-      discoveredKbs: Array.from(new Set([...kbs, 'KB5127646', 'KB5129195'])).sort(),
-      discoveredBuilds: Array.from(new Set([...builds, '26200.9711', '28000.3231'])).sort(),
+      discoveredVersions: Array.from(
+        new Set([...versions, '26H2', '26H1', '25H2', '24H2', '23H2'])
+      ).sort(),
+      discoveredKbs: Array.from(
+        new Set([...kbs, 'KB5132061', 'KB5132059', 'KB5131087', 'KB5127936'])
+      ).sort(),
+      discoveredBuilds: Array.from(
+        new Set([...builds, '26300.9974', '26200.9974', '26100.9974', '28000.3501', '22631.7711'])
+      ).sort(),
       mergedUpdates: combined,
     };
   } catch {
     return {
       liveScraped: false,
-      discoveredVersions: ['22H2', '23H2', '24H2', '26H1', '26H2'],
+      discoveredVersions: ['22H2', '23H2', '24H2', '25H2', '26H1', '26H2'],
       discoveredKbs: CURATED_UPDATES.map((u) => u.kb).sort(),
       discoveredBuilds: CURATED_UPDATES.map((u) => u.build).sort(),
       mergedUpdates: CURATED_UPDATES,
