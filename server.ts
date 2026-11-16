@@ -330,6 +330,25 @@ function writeStateFile(state: Record<string, unknown>) {
   fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), 'utf-8');
 }
 
+function inferVersionList(builds: string[]): string[] {
+  const vers: string[] = [];
+  if (builds.some((b) => b.startsWith('26300.'))) vers.push('26H2');
+  if (builds.some((b) => b.startsWith('26200.'))) vers.push('25H2');
+  if (builds.some((b) => b.startsWith('26100.'))) vers.push('24H2');
+  if (builds.some((b) => b.startsWith('28000.'))) vers.push('26H1');
+  if (builds.some((b) => b.startsWith('22631.'))) vers.push('23H2');
+  if (builds.some((b) => b.startsWith('22621.'))) vers.push('22H2');
+  if (builds.some((b) => b.startsWith('22000.'))) vers.push('21H2');
+  return vers;
+}
+
+function formatVersionLabel(vers: string[]): string {
+  if (vers.length === 0) return '26H2, 25H2 & 24H2';
+  if (vers.length === 1) return vers[0];
+  if (vers.length === 2) return `${vers[0]} & ${vers[1]}`;
+  return `${vers.slice(0, -1).join(', ')} & ${vers[vers.length - 1]}`;
+}
+
 async function scrapeMicrosoftReleaseHealth(): Promise<{
   liveScraped: boolean;
   discoveredVersions: string[];
@@ -359,10 +378,18 @@ async function scrapeMicrosoftReleaseHealth(): Promise<{
     ).sort();
     const versions = Array.from(new Set(html.match(/\b2[1-9]H[12]\b/g) || [])).sort();
 
-    // Extract ALL table rows from Microsoft Release Health HTML (no 10-row cap)
+    // Multi-table aggregator: group all builds across all Microsoft HTML tables by KB
     const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-    const liveItems: Win11UpdateItem[] = [];
-    const seenIds = new Set(CURATED_UPDATES.map((u) => u.kb));
+    const kbGroups = new Map<
+      string,
+      {
+        kb: string;
+        releaseDate: string;
+        builds: Set<string>;
+        cadenceCode: 'B' | 'C' | 'D' | 'OOB';
+        isHotpatch: boolean;
+      }
+    >();
 
     let match: RegExpExecArray | null;
     while ((match = rowRegex.exec(html)) !== null) {
@@ -373,42 +400,150 @@ async function scrapeMicrosoftReleaseHealth(): Promise<{
       );
       const dateMatch = rowHtml.match(/\b202\d-\d{2}-\d{2}\b/);
 
-      if (kbMatch && buildMatches && dateMatch && !seenIds.has(kbMatch[0])) {
-        seenIds.add(kbMatch[0]);
-        const uniqueBuilds = Array.from(new Set(buildMatches));
-        const buildStr = uniqueBuilds.join(' · ');
+      if (!kbMatch || !buildMatches || !dateMatch) continue;
+      const kb = kbMatch[0];
+      const releaseDate = dateMatch[0];
+      const cleanText = rowHtml.replace(/<[^>]+>/g, ' ');
+      const cadenceMatch = cleanText.match(/\b202\d[-.]\d{2}\s+(B|C|D|OOB)\b/i);
+      const cadenceCode = (
+        cadenceMatch ? cadenceMatch[1].toUpperCase() : 'B'
+      ) as 'B' | 'C' | 'D' | 'OOB';
+      const isHotpatch = /hotpatch/i.test(cleanText);
 
-        const verParts: string[] = [];
-        if (uniqueBuilds.some((b) => b.startsWith('26300'))) verParts.push('26H2');
-        if (uniqueBuilds.some((b) => b.startsWith('26200'))) verParts.push('25H2');
-        if (uniqueBuilds.some((b) => b.startsWith('26100'))) verParts.push('24H2');
-        if (uniqueBuilds.some((b) => b.startsWith('28000'))) verParts.push('26H1');
-        if (uniqueBuilds.some((b) => b.startsWith('22631'))) verParts.push('23H2');
-        if (uniqueBuilds.some((b) => b.startsWith('22621'))) verParts.push('22H2');
-        const verLabel = verParts.length > 0 ? verParts.join(', ') : '26H2 / 25H2 / 24H2';
-
-        const isPreview = /preview|optional|non-security|c-release|d-release/i.test(rowHtml);
-        liveItems.push({
-          id: `${kbMatch[0]}-${uniqueBuilds[0]}`,
-          kb: kbMatch[0],
-          build: buildStr,
-          version: verLabel,
-          type: isPreview ? 'Out-of-Band / Preview' : 'Security / Cumulative KB',
-          releaseDate: dateMatch[0],
-          title: `Windows 11 ${ isPreview ? 'Optional Preview Update' : 'Cumulative Security Update' } ${kbMatch[0]} (${verLabel})`,
-          highlights: `Official Microsoft Windows 11 Release Health package for version ${verLabel} (OS Build ${buildStr}).`,
-          servicingChannel: isPreview
-            ? 'Optional Preview Channel'
-            : 'General Availability (B-Release)',
-          sourceUrl: `https://support.microsoft.com/help/${kbMatch[0].replace('KB', '')}`,
-          isNew: dateMatch[0] >= '2026-11-01',
-        });
+      let entry = kbGroups.get(kb);
+      if (!entry) {
+        entry = {
+          kb,
+          releaseDate,
+          builds: new Set<string>(),
+          cadenceCode,
+          isHotpatch,
+        };
+        kbGroups.set(kb, entry);
+      } else if (releaseDate > entry.releaseDate) {
+        entry.releaseDate = releaseDate;
+      }
+      for (const b of buildMatches) {
+        entry.builds.add(b);
       }
     }
 
-    const combined = [...CURATED_UPDATES, ...liveItems].sort((a, b) =>
-      b.releaseDate.localeCompare(a.releaseDate)
-    );
+    const curatedByKb = new Map(CURATED_UPDATES.map((u) => [u.kb, u]));
+    const parsedItems: Array<Win11UpdateItem & { _versionsList: string[]; _cadence: string }> = [];
+
+    for (const [kb, info] of kbGroups.entries()) {
+      const sortedBuilds = Array.from(info.builds).sort().reverse();
+      const verList = inferVersionList(sortedBuilds);
+      const verLabel = formatVersionLabel(verList);
+      const buildStr = sortedBuilds.join(' · ');
+
+      const isPreview = info.cadenceCode === 'C' || info.cadenceCode === 'D';
+      const isOob = info.cadenceCode === 'OOB';
+
+      let typeLabel: Win11UpdateItem['type'] = 'Security / Cumulative KB';
+      let servicingChannel = 'General Availability (Mandatory B-Release)';
+      let defaultTitle = `Windows 11 Mandatory Patch Tuesday Security Update ${kb} (${verLabel})`;
+      let defaultHighlights = `Mandatory Patch Tuesday cumulative security update for Windows 11 version ${verLabel} (OS Build ${buildStr}). Includes monthly security patches and cumulative quality improvements.`;
+
+      if (isPreview) {
+        typeLabel = 'Out-of-Band / Preview';
+        servicingChannel = `Optional Preview Channel (${info.cadenceCode}-Release)`;
+        defaultTitle = `Windows 11 Optional Non-Security Preview Update ${kb} (${verLabel})`;
+        defaultHighlights = `Optional ${info.cadenceCode}-release non-security preview update for Windows 11 ${verLabel} (OS Build ${buildStr}). Safe to skip while WUB is active; all changes roll into the next Patch Tuesday security update.`;
+      } else if (isOob) {
+        typeLabel = 'Security / Cumulative KB';
+        servicingChannel = 'Out-of-Band Hotfix (OOB)';
+        defaultTitle = `Windows 11 Out-of-Band (OOB) Update ${kb} (${verLabel})`;
+        defaultHighlights = `Out-of-Band cumulative update for Windows 11 version ${verLabel} (OS Build ${buildStr}).`;
+      } else if (info.isHotpatch) {
+        typeLabel = 'Security / Cumulative KB';
+        servicingChannel = 'Enterprise Hotpatch (B-Release)';
+        defaultTitle = `Windows 11 Enterprise Hotpatch Security Update ${kb} (${verLabel})`;
+        defaultHighlights = `Monthly Enterprise Hotpatch security update for Windows 11 ${verLabel} (OS Build ${buildStr}). Applies security fixes without requiring a system reboot.`;
+      }
+
+      const curated = curatedByKb.get(kb);
+
+      parsedItems.push({
+        id: `${kb}-${sortedBuilds[0] || '0'}`,
+        kb,
+        build: buildStr,
+        version: verLabel,
+        type: curated ? curated.type : typeLabel,
+        releaseDate: info.releaseDate,
+        title: curated ? curated.title : defaultTitle,
+        highlights: curated ? curated.highlights : defaultHighlights,
+        servicingChannel: curated ? curated.servicingChannel : servicingChannel,
+        sourceUrl: `https://support.microsoft.com/help/${kb.replace('KB', '')}`,
+        isNew: info.releaseDate >= '2026-11-01',
+        supersededBy: curated?.supersededBy,
+        includesPreviewKb: curated?.includesPreviewKb,
+        _versionsList: verList,
+        _cadence: info.cadenceCode,
+      });
+    }
+
+    // Sort newest first (and B before D on same date)
+    parsedItems.sort((a, b) => {
+      const cmp = b.releaseDate.localeCompare(a.releaseDate);
+      if (cmp !== 0) return cmp;
+      return a.kb.localeCompare(b.kb);
+    });
+
+    // Dynamically compute superseding and included-preview links for every live-scraped KB
+    for (let i = 0; i < parsedItems.length; i++) {
+      const item = parsedItems[i];
+      const itemVers = new Set(item._versionsList);
+
+      // 1. Find newer B-release Security KB covering overlapping Windows 11 versions
+      if (!item.supersededBy) {
+        for (let j = 0; j < i; j++) {
+          const newer = parsedItems[j];
+          if (
+            newer.releaseDate > item.releaseDate &&
+            newer.type === 'Security / Cumulative KB' &&
+            !newer.servicingChannel.includes('Hotpatch') &&
+            newer._versionsList.some((v) => itemVers.has(v))
+          ) {
+            item.supersededBy = `${newer.kb} (${newer.releaseDate} Patch Tuesday)`;
+            break;
+          }
+        }
+      }
+
+      // 2. If this item is a mandatory B-release, find the most recent prior C/D preview it rolls up
+      if (
+        !item.includesPreviewKb &&
+        item.type === 'Security / Cumulative KB' &&
+        !item.servicingChannel.includes('Hotpatch')
+      ) {
+        for (let k = i + 1; k < parsedItems.length; k++) {
+          const older = parsedItems[k];
+          if (
+            older.releaseDate < item.releaseDate &&
+            older.type === 'Out-of-Band / Preview' &&
+            older._versionsList.some((v) => itemVers.has(v))
+          ) {
+            item.includesPreviewKb = `${older.kb} (Released ${older.releaseDate})`;
+            break;
+          }
+        }
+      }
+    }
+
+    const finalUpdates: Win11UpdateItem[] = parsedItems
+      .slice(0, 45)
+      .map(({ _versionsList, _cadence, ...rest }) => rest);
+
+    // Ensure any curated item not on the current HTML page is still available if needed
+    const seenFinal = new Set(finalUpdates.map((u) => u.kb));
+    for (const c of CURATED_UPDATES) {
+      if (!seenFinal.has(c.kb)) {
+        finalUpdates.push(c);
+      }
+    }
+    finalUpdates.sort((a, b) => b.releaseDate.localeCompare(a.releaseDate));
+
     return {
       liveScraped: true,
       discoveredVersions: Array.from(
@@ -420,15 +555,19 @@ async function scrapeMicrosoftReleaseHealth(): Promise<{
       discoveredBuilds: Array.from(
         new Set([...builds, '26300.9974', '26200.9974', '26100.9974', '28000.3501', '22631.7711'])
       ).sort(),
-      mergedUpdates: combined,
+      mergedUpdates: finalUpdates,
     };
   } catch {
+    const state = readStateFile();
+    const stateUpdates = Array.isArray(state.recent_updates)
+      ? (state.recent_updates as Win11UpdateItem[])
+      : CURATED_UPDATES;
     return {
       liveScraped: false,
       discoveredVersions: ['22H2', '23H2', '24H2', '25H2', '26H1', '26H2'],
-      discoveredKbs: CURATED_UPDATES.map((u) => u.kb).sort(),
-      discoveredBuilds: CURATED_UPDATES.map((u) => u.build).sort(),
-      mergedUpdates: CURATED_UPDATES,
+      discoveredKbs: stateUpdates.map((u) => u.kb).sort(),
+      discoveredBuilds: stateUpdates.map((u) => u.build).sort(),
+      mergedUpdates: stateUpdates,
     };
   }
 }

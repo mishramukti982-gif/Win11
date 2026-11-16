@@ -260,7 +260,9 @@ export default function App() {
   const [updates, setUpdates] = useState<Win11UpdateItem[]>(VERIFIED_UPDATES);
   const [checkingNow, setCheckingNow] = useState<boolean>(false);
   const [sendingAlert, setSendingAlert] = useState<boolean>(false);
-  const [showAllHistory, setShowAllHistory] = useState<boolean>(true);
+  const [activeTab, setActiveTab] = useState<'summary' | 'cards' | 'history'>('summary');
+  const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
+  const [lastLiveSyncLabel, setLastLiveSyncLabel] = useState<string>('Live Microsoft Release Health Parser Active');
 
   // WUB (Windows Update Blocker) State — v2 key ensures fresh Nov 2026 default window
   const [wubIsBlocked, setWubIsBlocked] = useState<boolean>(() => {
@@ -321,28 +323,56 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  // Fetch live updates from server when available, merging with verified Nov 2026 releases
+  // Fetch live updates from server when available, or fallback to GitHub Action's live state/last_seen.json on Android APK
   const fetchUpdates = async () => {
+    const mergeWithVerified = (incoming: Win11UpdateItem[]) => {
+      const byKb = new Map<string, Win11UpdateItem>();
+      for (const item of incoming) {
+        if (item && item.kb) byKb.set(item.kb, item);
+      }
+      for (const verified of VERIFIED_UPDATES) {
+        const existing = byKb.get(verified.kb);
+        byKb.set(verified.kb, existing ? { ... existing, ...verified } : verified);
+      }
+      return Array.from(byKb.values()).sort((a, b) =>
+        b.releaseDate.localeCompare(a.releaseDate)
+      );
+    };
+
     try {
       const resp = await fetch('/api/updates');
       if (resp.ok) {
         const data = await resp.json();
         if (Array.isArray(data.updates) && data.updates.length > 0) {
-          const byKb = new Map<string, Win11UpdateItem>();
-          for (const item of data.updates) {
-            byKb.set(item.kb, item);
+          setUpdates(mergeWithVerified(data.updates));
+          if (data.liveScraped) {
+            setLastLiveSyncLabel(
+              `Synced live from learn.microsoft.com (${data.updates.length} KBs parsed across all versions)`
+            );
           }
-          for (const verified of VERIFIED_UPDATES) {
-            byKb.set(verified.kb, verified);
-          }
-          const merged = Array.from(byKb.values()).sort((a, b) =>
-            b.releaseDate.localeCompare(a.releaseDate)
-          );
-          setUpdates(merged);
+          return;
         }
       }
+      throw new Error('Try GitHub Raw fallback');
     } catch {
-      // Offline or standalone Android APK mode uses VERIFIED_UPDATES
+      try {
+        const ghResp = await fetch(
+          'https://raw.githubusercontent.com/mishramukti982-gif/Win11/main/state/last_seen.json',
+          { cache: 'no-store' }
+        );
+        if (ghResp.ok) {
+          const ghState = await ghResp.json();
+          if (Array.isArray(ghState.recent_updates) && ghState.recent_updates.length > 0) {
+            setUpdates(mergeWithVerified(ghState.recent_updates));
+            setLastLiveSyncLabel(
+              `Synced from GitHub Actions Live State (${ghState.recent_updates.length} KBs)`
+            );
+            return;
+          }
+        }
+      } catch {
+        // Offline fallback
+      }
       setUpdates(VERIFIED_UPDATES);
     }
   };
@@ -802,9 +832,10 @@ export default function App() {
           </a>
           <a
             href="#step-updates"
+            onClick={() => setActiveTab('summary')}
             className="hover:text-white transition-colors whitespace-nowrap shrink-0"
           >
-            Nov 2026 KBs
+            Summary Tab
           </a>
           <a
             href="#step-apk"
@@ -1111,255 +1142,592 @@ export default function App() {
         </section>
 
         {/* =====================================================================
-            STEP 3: VERIFIED UPDATES DURING YOUR SELECTED WINDOW (ALL VERSIONS)
+            STEP 3: SUMMARY TAB + SEPARATED CARDS + ALL RELEASES TABLE
            ===================================================================== */}
         <section id="step-updates" className="space-y-4 scroll-mt-20">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-bold text-white font-display">
-                Verified Microsoft Updates From {wubStartDate} to {todayIso}
+                Windows 11 Update Summary &amp; WUB Window Analysis ({wubStartDate} → {todayIso})
               </h2>
-              <p className="text-xs sm:text-sm text-slate-400">
-                Showing all Windows 11 versions together (<strong>26H2, 25H2, 24H2, 26H1, 23H2</strong>)
-                with automatic superseding detection.
+              <p className="text-xs sm:text-sm text-slate-400 font-mono-tabular">
+                {lastLiveSyncLabel} · Covering <strong>26H2, 25H2, 24H2, 26H1 &amp; 23H2</strong>
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => sendAlertToPhoneAndDiscord(wubStartDate, false)}
-              disabled={sendingAlert}
-              className="min-h-[40px] px-4 py-2 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg whitespace-nowrap shrink-0 flex items-center gap-2 cursor-pointer"
-            >
-              <Send className="w-3.5 h-3.5 text-sky-400" />
-              <span>Re-Send This Range to Discord &amp; Phone</span>
-            </button>
+
+            {/* View Tab Switcher: Summary Tab | Security vs. Preview Cards | All Releases Table */}
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <div className="inline-flex bg-[#111827] border border-slate-800 rounded-lg p-1 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('summary')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
+                    activeTab === 'summary'
+                      ? 'bg-sky-400 text-slate-950'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  Summary Tab
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('cards')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
+                    activeTab === 'cards'
+                      ? 'bg-sky-400 text-slate-950'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  Security vs. Preview ({wubMetrics.allInRange.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('history')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
+                    activeTab === 'history'
+                      ? 'bg-sky-400 text-slate-950'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  All Releases ({updates.length})
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => sendAlertToPhoneAndDiscord(wubStartDate, false)}
+                disabled={sendingAlert}
+                className="min-h-[38px] px-3.5 py-1.5 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg whitespace-nowrap shrink-0 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5 text-sky-400" />
+                <span>Send Summary to Discord &amp; Phone</span>
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-            {/* Box A: Mandatory Security / Cumulative KBs (High Priority) */}
-            <div className="bg-[#111827] border border-slate-800 rounded-xl p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0" />
-                  <div>
-                    <h3 className="text-base font-bold text-white font-display">
-                      Mandatory Security &amp; Cumulative KBs ({wubMetrics.securityUpdates.length})
-                    </h3>
-                    <p className="text-xs text-rose-300">
-                      Patch Tuesday Security Updates — Raises Risk Meter &amp; Pings @everyone
-                    </p>
+          {/* =================================================================
+              TAB 1: SUMMARY TAB (PLAIN-ENGLISH EXECUTIVE SUMMARY + BY-VERSION GUIDE)
+             ================================================================= */}
+          {activeTab === 'summary' && (
+            <div className="bg-[#111827] border border-slate-800 rounded-xl p-5 sm:p-6 space-y-6">
+              {/* Plain-English Bottom Line Banner */}
+              <div className="bg-[#0B0F17] border border-slate-800 rounded-xl p-4 sm:p-5 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-mono-tabular">
+                    <span className="text-sky-400 font-bold">WINDOW SUMMARY</span>
+                    <span aria-hidden="true">·</span>
+                    <span className="text-white font-semibold">
+                      {wubStartDate} → {todayIso} ({wubMetrics.daysBlocked}d Blocked)
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span className={`font-bold ${riskTextAccent}`}>
+                      RISK: {wubMetrics.riskLevel}
+                    </span>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const summaryText = [
+                        `Windows 11 WUB Summary (${wubStartDate} -> ${todayIso})`,
+                        `Status: ${wubIsBlocked ? 'BLOCKED' : 'UNBLOCKED'} | Risk: ${wubMetrics.riskLevel} (${wubMetrics.riskReason})`,
+                        `Mandatory Security KBs in window (${wubMetrics.securityUpdates.length}): ${
+                          wubMetrics.securityUpdates
+                            .map((u) => `${u.kb} [${u.version} - ${u.releaseDate}]`)
+                            .join(', ') || 'None'
+                        }`,
+                        `Optional Previews in window (${wubMetrics.previewUpdates.length}): ${
+                          wubMetrics.previewUpdates
+                            .map((u) => `${u.kb} [${u.version} - ${u.releaseDate}]`)
+                            .join(', ') || 'None'
+                        }`,
+                        wubMetrics.preWindowSupersededPreview
+                          ? `Rollup Note: KB5132061 (Nov 10) includes every change from the Oct 28 optional update KB5127936.`
+                          : '',
+                      ]
+                        .filter(Boolean)
+                        .join('\n');
+                      navigator.clipboard?.writeText(summaryText);
+                      setCopiedSummary(true);
+                      setTimeout(() => setCopiedSummary(false), 2500);
+                      showToast(
+                        'Summary Copied to Clipboard',
+                        'Ready to paste into Discord, notes, or share with your team.',
+                        'success'
+                      );
+                    }}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 cursor-pointer"
+                  >
+                    {copiedSummary ? 'Copied Summary!' : 'Copy Plain-English Summary'}
+                  </button>
+                </div>
+
+                {/* Dynamic Plain-English Bullet Points */}
+                <ul className="text-xs sm:text-sm text-slate-200 space-y-2 leading-relaxed list-disc list-inside">
+                  {wubMetrics.securityUpdates.length > 0 ? (
+                    <li>
+                      <strong className="text-rose-300">
+                        Yes — Mandatory Patch Tuesday Security Updates Dropped Inside Your Window:
+                      </strong>{' '}
+                      Microsoft released{' '}
+                      <strong>{wubMetrics.securityUpdates.length} mandatory security KB package(s)</strong>{' '}
+                      between <code className="text-white font-mono-tabular">{wubStartDate}</code> and{' '}
+                      <code className="text-white font-mono-tabular">{todayIso}</code>:{' '}
+                      {wubMetrics.securityUpdates.map((u, idx) => (
+                        <span key={u.id}>
+                          {idx > 0 ? ', ' : ''}
+                          <code className="text-white font-bold font-mono-tabular">{u.kb}</code> (
+                          {u.version} on {u.releaseDate})
+                        </span>
+                      ))}
+                      .
+                    </li>
+                  ) : (
+                    <li>
+                      <strong className="text-emerald-300">
+                        No Mandatory Security Updates Missed:
+                      </strong>{' '}
+                      0 mandatory Patch Tuesday security KBs were released between{' '}
+                      <code className="text-white font-mono-tabular">{wubStartDate}</code> and{' '}
+                      <code className="text-white font-mono-tabular">{todayIso}</code>.
+                    </li>
+                  )}
+
+                  {wubMetrics.securityUpdates.some((u) => u.kb === 'KB5132061') && (
+                    <li>
+                      <strong className="text-sky-300">
+                        November 10, 2026 Patch Tuesday Breakdown:
+                      </strong>{' '}
+                      <code className="text-white font-mono-tabular">KB5132061</code> covers Windows
+                      11 versions <strong>26H2, 25H2, and 24H2</strong> (Builds{' '}
+                      <code className="text-slate-300 font-mono-tabular">
+                        26300.9974 · 26200.9974 · 26100.9974
+                      </code>
+                      ). <code className="text-white font-mono-tabular">KB5132059</code> covers{' '}
+                      <strong>26H1</strong> (Build{' '}
+                      <code className="text-slate-300 font-mono-tabular">28000.3501</code>), and{' '}
+                      <code className="text-white font-mono-tabular">KB5131087</code> covers{' '}
+                      <strong>23H2</strong> (Build{' '}
+                      <code className="text-slate-300 font-mono-tabular">22631.7711</code>). All three
+                      are mandatory B-release security updates.
+                    </li>
+                  )}
+
+                  {(wubMetrics.preWindowSupersededPreview ||
+                    wubMetrics.previewUpdates.some((u) => u.kb === 'KB5127936')) && (
+                    <li>
+                      <strong className="text-emerald-300">
+                        October 28 Optional Update (KB5127936) Rollup Status:
+                      </strong>{' '}
+                      <code className="text-white font-mono-tabular">KB5132061</code> (Nov 10)
+                      includes <strong>every change</strong> from the October 28 optional non-security
+                      preview update <code className="text-white font-mono-tabular">KB5127936</code>{' '}
+                      (which came out on <code className="text-white font-mono-tabular">2026-10-28</code>
+                      ). You do <strong>not</strong> need to install{' '}
+                      <code className="text-white font-mono-tabular">KB5127936</code> separately—it is
+                      automatically marked <strong>Superseded by KB5132061</strong>.
+                    </li>
+                  )}
+
+                  <li>
+                    <strong className="text-amber-300">WUB Safe-Window Recommendation:</strong>{' '}
+                    {wubIsBlocked
+                      ? wubMetrics.riskLevel === 'HIGH'
+                        ? `Your risk meter is HIGH (${wubMetrics.riskReason}). Unblock WUB when ready, install the single latest cumulative KB for your Windows 11 version below, and click "Mark as Unblocked (Reset)".`
+                        : wubMetrics.riskLevel === 'MODERATE'
+                        ? `Your risk meter is MODERATE (${wubMetrics.riskReason}). Plan to unblock on or before ${wubPlannedUnblockDate}.`
+                        : `Your risk meter is SAFE (${wubMetrics.riskReason}). You can safely keep updates blocked until ${wubPlannedUnblockDate}.`
+                      : 'Your PC is currently marked as Unblocked (0 days blocked, 0 missed security KBs).'}
+                  </li>
+                </ul>
+              </div>
+
+              {/* Version-by-Version Table: What Exact KB Should You Install When Unblocking? */}
+              <div className="space-y-3">
+                <h3 className="text-sm sm:text-base font-bold text-white font-display">
+                  What Exact Update You Need by Windows 11 Version (Cumulative Rollup Guide)
+                </h3>
+                <div className="overflow-x-auto border border-slate-800 rounded-xl">
+                  <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                    <thead>
+                      <tr className="bg-[#0B0F17] border-b border-slate-800 text-slate-400 font-mono-tabular">
+                        <th className="py-3 px-4 font-semibold">Windows 11 Version</th>
+                        <th className="py-3 px-4 font-semibold">Latest Mandatory Security KB</th>
+                        <th className="py-3 px-4 font-semibold">OS Build(s)</th>
+                        <th className="py-3 px-4 font-semibold">Superseded Previews Included Inside</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 font-mono-tabular">
+                      <tr className="bg-[#111827]/60">
+                        <td className="py-3 px-4 font-bold text-sky-400">
+                          26H2, 25H2 &amp; 24H2
+                        </td>
+                        <td className="py-3 px-4 text-white font-bold">
+                          KB5132061{' '}
+                          <span className="text-rose-400 font-normal">(2026-11-10 B-Release)</span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-300">
+                          26300.9974 · 26200.9974 · 26100.9974
+                        </td>
+                        <td className="py-3 px-4 text-emerald-300">
+                          Includes Oct 28 KB5127936 + Oct 13 KB5127648
+                        </td>
+                      </tr>
+                      <tr className="bg-[#111827]/60">
+                        <td className="py-3 px-4 font-bold text-sky-400">26H1</td>
+                        <td className="py-3 px-4 text-white font-bold">
+                          KB5132059{' '}
+                          <span className="text-rose-400 font-normal">(2026-11-10 B-Release)</span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-300">28000.3501</td>
+                        <td className="py-3 px-4 text-emerald-300">
+                          Includes Oct 28 KB5127653 + Oct 13 KB5127646
+                        </td>
+                      </tr>
+                      <tr className="bg-[#111827]/60">
+                        <td className="py-3 px-4 font-bold text-sky-400">
+                          23H2 (Enterprise / Edu)
+                        </td>
+                        <td className="py-3 px-4 text-white font-bold">
+                          KB5131087{' '}
+                          <span className="text-rose-400 font-normal">(2026-11-10 B-Release)</span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-300">22631.7711</td>
+                        <td className="py-3 px-4 text-emerald-300">
+                          Includes Oct 26 OOB KB5134130 + Oct 13 KB5126653
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
-              {!wubIsBlocked ? (
-                <div className="bg-[#0B0F17] border border-emerald-800/50 rounded-lg p-5 text-center space-y-2">
-                  <CheckCircle2 className="w-6 h-6 text-emerald-400 mx-auto" />
-                  <p className="text-sm font-semibold text-emerald-400">
-                    You Are Unblocked &amp; Up to Date!
+              {/* How Live Accuracy Works (Answering How Future Updates Are Parsed) */}
+              <div className="bg-[#0B0F17] border border-slate-800/90 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-emerald-400 font-mono-tabular">
+                    LIVE MULTI-TABLE PARSER · AUTOMATIC FUTURE ACCURACY
                   </p>
-                  <p className="text-xs text-slate-400">
-                    0 missed security updates. Your risk level is SAFE.
-                  </p>
-                </div>
-              ) : wubMetrics.securityUpdates.length === 0 ? (
-                <div className="bg-[#0B0F17] border border-emerald-800/50 rounded-lg p-5 text-center space-y-1.5">
-                  <p className="text-sm font-semibold text-emerald-400">
-                    0 Security KBs Missed Since {wubStartDate}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    No mandatory Patch Tuesday security updates have dropped since {wubStartDate}.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {wubMetrics.securityUpdates.map((item) => {
-                    const isChecked = Boolean(checkedKbs[item.kb]);
-                    const sup = getSupersedingLabel(item, updates);
-                    return (
-                      <div
-                        key={item.id}
-                        className="bg-[#0B0F17] border border-slate-800 rounded-lg p-4 space-y-2.5"
-                      >
-                        {/* Unboxed Metadata Line */}
-                        <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono-tabular">
-                          <span className="text-rose-400 font-bold">MANDATORY SECURITY KB</span>
-                          <span aria-hidden="true">·</span>
-                          <span className="text-white font-bold">{item.kb}</span>
-                          <span aria-hidden="true">·</span>
-                          <span className="text-sky-400 font-semibold">Win11 {item.version}</span>
-                          <span aria-hidden="true">·</span>
-                          <span className="text-slate-300">Released {item.releaseDate}</span>
-                        </div>
-
-                        <p className="text-xs text-slate-400 font-mono-tabular">
-                          OS Builds: {item.build}
-                        </p>
-
-                        <p className="text-xs sm:text-sm font-semibold text-white">
-                          {item.title}
-                        </p>
-
-                        <p className="text-xs text-slate-300 leading-relaxed">
-                          {item.highlights}
-                        </p>
-
-                        {item.includesPreviewKb && (
-                          <p className="text-xs text-emerald-300 font-mono-tabular">
-                            Supersedes &amp; includes all changes from: {item.includesPreviewKb}
-                          </p>
-                        )}
-
-                        {sup && (
-                          <p className="text-xs text-amber-300 font-mono-tabular">
-                            Superseded by: {sup} (Install the newer KB instead)
-                          </p>
-                        )}
-
-                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-slate-800/80">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setCheckedKbs((prev) => ({ ...prev, [item.kb]: !prev[item.kb] }))
-                            }
-                            className={`text-xs font-medium px-2.5 py-1.5 rounded flex items-center gap-1.5 cursor-pointer ${
-                              isChecked
-                                ? 'bg-emerald-500/20 text-emerald-300'
-                                : 'bg-slate-800 text-slate-300 hover:text-white'
-                            }`}
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>
-                              {isChecked ? 'Installed' : 'Check Off When Installed'}
-                            </span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => sendSingleKbAlert(item)}
-                            className="text-xs font-semibold px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-white flex items-center gap-1 cursor-pointer"
-                          >
-                            <Send className="w-3 h-3" />
-                            <span>Ping @everyone for {item.kb}</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Box B: Optional Preview Updates & Superseding Context (0 Risk — Safe to Skip) */}
-            <div className="bg-[#111827] border border-slate-800 rounded-xl p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
-                  <div>
-                    <h3 className="text-base font-bold text-white font-display">
-                      Optional Preview Updates ({wubMetrics.previewUpdates.length})
-                    </h3>
-                    <p className="text-xs text-emerald-300">
-                      0 Security Risk — Safe to Skip &amp; Auto-Marked When Superseded
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pre-Window Superseding Notice when WUB Start Date is just after Oct 28 */}
-              {wubMetrics.preWindowSupersededPreview && (
-                <div className="bg-[#0B0F17] border border-sky-800/60 rounded-lg p-4 space-y-1.5">
-                  <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono-tabular">
-                    <span className="text-sky-400 font-bold">PRE-WINDOW ROLLUP NOTE</span>
-                    <span aria-hidden="true">·</span>
-                    <span className="text-white font-bold">
-                      {wubMetrics.preWindowSupersededPreview.kb}
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <span className="text-slate-300">
-                      Released {wubMetrics.preWindowSupersededPreview.releaseDate}
-                    </span>
-                  </div>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    The October 28 optional preview update{' '}
-                    <code className="text-white font-mono-tabular">KB5127936</code> (Win11 26H2 &amp;
-                    25H2, Builds <code className="text-slate-200">26300.9818 · 26200.9818</code>)
-                    came out just before your <code className="text-white">{wubStartDate}</code>{' '}
-                    start date. It is now{' '}
-                    <strong className="text-emerald-300">
-                      Superseded by KB5132061 (2026-11-10)
-                    </strong>
-                    , which includes every change from <code className="text-white">KB5127936</code>.
+                    Every check parses all HTML tables on Microsoft’s official Release Information
+                    page, reads Microsoft’s exact servicing column (<code className="text-white">YYYY-MM B</code>{' '}
+                    = Mandatory Patch Tuesday Security, <code className="text-white">YYYY-MM D / C</code>{' '}
+                    = Optional Preview, <code className="text-white">YYYY-MM OOB</code> = Out-of-Band
+                    Hotfix), groups builds across 26H2/25H2/24H2/26H1/23H2 per KB, and automatically
+                    calculates which newer B-release supersedes older C/D previews.
                   </p>
                 </div>
-              )}
-
-              {wubMetrics.previewUpdates.length === 0 ? (
-                <div className="bg-[#0B0F17] border border-slate-800 rounded-lg p-5 text-center space-y-1.5">
-                  <p className="text-sm font-medium text-slate-300">
-                    0 Optional Preview Updates Released Inside {wubStartDate} → {todayIso}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    Set your start date to <strong>2026-10-14</strong> (or tap the preset button in
-                    Step 2) to see the October 28 optional update (<code>KB5127936</code>) inside
-                    the range.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {wubMetrics.previewUpdates.map((item) => {
-                    const sup = getSupersedingLabel(item, updates);
-                    return (
-                      <div
-                        key={item.id}
-                        className="bg-[#0B0F17] border border-slate-800 rounded-lg p-4 space-y-2"
-                      >
-                        <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono-tabular text-slate-400">
-                          <span className="text-emerald-400 font-bold">
-                            OPTIONAL PREVIEW (0 RISK)
-                          </span>
-                          <span aria-hidden="true">·</span>
-                          <span className="text-white font-bold">{item.kb}</span>
-                          <span aria-hidden="true">·</span>
-                          <span className="text-sky-400">Win11 {item.version}</span>
-                          <span aria-hidden="true">·</span>
-                          <span>Released {item.releaseDate}</span>
-                        </div>
-
-                        <p className="text-xs text-slate-400 font-mono-tabular">
-                          OS Builds: {item.build}
-                        </p>
-
-                        <p className="text-xs sm:text-sm font-semibold text-white">{item.title}</p>
-                        <p className="text-xs text-slate-300 leading-relaxed">{item.highlights}</p>
-
-                        {sup && (
-                          <p className="text-xs font-semibold text-amber-300 font-mono-tabular">
-                            Status: Superseded by {sup}
-                          </p>
-                        )}
-
-                        <div className="pt-2 border-t border-slate-800/80 flex justify-end">
-                          <button
-                            type="button"
-                            onClick={() => sendSingleKbAlert(item)}
-                            className="text-xs font-medium px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center gap-1 cursor-pointer"
-                          >
-                            <Bell className="w-3 h-3 text-sky-400" />
-                            <span>Send Normal Info Alert (No Ping)</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('cards')}
+                  className="min-h-[38px] px-3.5 py-2 text-xs font-semibold text-slate-950 bg-sky-400 hover:bg-sky-300 rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  View Detailed KB Cards →
+                </button>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* =================================================================
+              TAB 2: SEPARATED SECURITY VS. PREVIEW CARDS
+             ================================================================= */}
+          {activeTab === 'cards' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+              {/* Box A: Mandatory Security / Cumulative KBs (High Priority) */}
+              <div className="bg-[#111827] border border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0" />
+                    <div>
+                      <h3 className="text-base font-bold text-white font-display">
+                        Mandatory Security &amp; Cumulative KBs ({wubMetrics.securityUpdates.length})
+                      </h3>
+                      <p className="text-xs text-rose-300">
+                        Patch Tuesday Security Updates — Raises Risk Meter &amp; Pings @everyone
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {!wubIsBlocked ? (
+                  <div className="bg-[#0B0F17] border border-emerald-800/50 rounded-lg p-5 text-center space-y-2">
+                    <CheckCircle2 className="w-6 h-6 text-emerald-400 mx-auto" />
+                    <p className="text-sm font-semibold text-emerald-400">
+                      You Are Unblocked &amp; Up to Date!
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      0 missed security updates. Your risk level is SAFE.
+                    </p>
+                  </div>
+                ) : wubMetrics.securityUpdates.length === 0 ? (
+                  <div className="bg-[#0B0F17] border border-emerald-800/50 rounded-lg p-5 text-center space-y-1.5">
+                    <p className="text-sm font-semibold text-emerald-400">
+                      0 Security KBs Missed Since {wubStartDate}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      No mandatory Patch Tuesday security updates have dropped since {wubStartDate}.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {wubMetrics.securityUpdates.map((item) => {
+                      const isChecked = Boolean(checkedKbs[item.kb]);
+                      const sup = getSupersedingLabel(item, updates);
+                      return (
+                        <div
+                          key={item.id}
+                          className="bg-[#0B0F17] border border-slate-800 rounded-lg p-4 space-y-2.5"
+                        >
+                          {/* Unboxed Metadata Line */}
+                          <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono-tabular">
+                            <span className="text-rose-400 font-bold">MANDATORY SECURITY KB</span>
+                            <span aria-hidden="true">·</span>
+                            <span className="text-white font-bold">{item.kb}</span>
+                            <span aria-hidden="true">·</span>
+                            <span className="text-sky-400 font-semibold">Win11 {item.version}</span>
+                            <span aria-hidden="true">·</span>
+                            <span className="text-slate-300">Released {item.releaseDate}</span>
+                          </div>
+
+                          <p className="text-xs text-slate-400 font-mono-tabular">
+                            OS Builds: {item.build}
+                          </p>
+
+                          <p className="text-xs sm:text-sm font-semibold text-white">
+                            {item.title}
+                          </p>
+
+                          <p className="text-xs text-slate-300 leading-relaxed">
+                            {item.highlights}
+                          </p>
+
+                          {item.includesPreviewKb && (
+                            <p className="text-xs text-emerald-300 font-mono-tabular">
+                              Supersedes &amp; includes all changes from: {item.includesPreviewKb}
+                            </p>
+                          )}
+
+                          {sup && (
+                            <p className="text-xs text-amber-300 font-mono-tabular">
+                              Superseded by: {sup} (Install the newer KB instead)
+                            </p>
+                          )}
+
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-slate-800/80">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCheckedKbs((prev) => ({ ...prev, [item.kb]: !prev[item.kb] }))
+                              }
+                              className={`text-xs font-medium px-2.5 py-1.5 rounded flex items-center gap-1.5 cursor-pointer ${
+                                isChecked
+                                  ? 'bg-emerald-500/20 text-emerald-300'
+                                  : 'bg-slate-800 text-slate-300 hover:text-white'
+                              }`}
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>
+                                {isChecked ? 'Installed' : 'Check Off When Installed'}
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => sendSingleKbAlert(item)}
+                              className="text-xs font-semibold px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-white flex items-center gap-1 cursor-pointer"
+                            >
+                              <Send className="w-3 h-3" />
+                              <span>Ping @everyone for {item.kb}</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Box B: Optional Preview Updates & Superseding Context (0 Risk — Safe to Skip) */}
+              <div className="bg-[#111827] border border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+                    <div>
+                      <h3 className="text-base font-bold text-white font-display">
+                        Optional Preview Updates ({wubMetrics.previewUpdates.length})
+                      </h3>
+                      <p className="text-xs text-emerald-300">
+                        0 Security Risk — Safe to Skip &amp; Auto-Marked When Superseded
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pre-Window Superseding Notice when WUB Start Date is just after Oct 28 */}
+                {wubMetrics.preWindowSupersededPreview && (
+                  <div className="bg-[#0B0F17] border border-sky-800/60 rounded-lg p-4 space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono-tabular">
+                      <span className="text-sky-400 font-bold">PRE-WINDOW ROLLUP NOTE</span>
+                      <span aria-hidden="true">·</span>
+                      <span className="text-white font-bold">
+                        {wubMetrics.preWindowSupersededPreview.kb}
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span className="text-slate-300">
+                        Released {wubMetrics.preWindowSupersededPreview.releaseDate}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      The October 28 optional preview update{' '}
+                      <code className="text-white font-mono-tabular">KB5127936</code> (Win11 26H2 &amp;
+                      25H2, Builds <code className="text-slate-200">26300.9818 · 26200.9818</code>)
+                      came out just before your <code className="text-white">{wubStartDate}</code>{' '}
+                      start date. It is now{' '}
+                      <strong className="text-emerald-300">
+                        Superseded by KB5132061 (2026-11-10)
+                      </strong>
+                      , which includes every change from <code className="text-white">KB5127936</code>.
+                    </p>
+                  </div>
+                )}
+
+                {wubMetrics.previewUpdates.length === 0 ? (
+                  <div className="bg-[#0B0F17] border border-slate-800 rounded-lg p-5 text-center space-y-1.5">
+                    <p className="text-sm font-medium text-slate-300">
+                      0 Optional Preview Updates Released Inside {wubStartDate} → {todayIso}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Set your start date to <strong>2026-10-14</strong> (or tap the preset button in
+                      Step 2) to see the October 28 optional updates (<code>KB5127936</code> &amp;{' '}
+                      <code>KB5127653</code>) inside the range.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {wubMetrics.previewUpdates.map((item) => {
+                      const sup = getSupersedingLabel(item, updates);
+                      return (
+                        <div
+                          key={item.id}
+                          className="bg-[#0B0F17] border border-slate-800 rounded-lg p-4 space-y-2"
+                        >
+                          <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono-tabular text-slate-400">
+                            <span className="text-emerald-400 font-bold">
+                              OPTIONAL PREVIEW (0 RISK)
+                            </span>
+                            <span aria-hidden="true">·</span>
+                            <span className="text-white font-bold">{item.kb}</span>
+                            <span aria-hidden="true">·</span>
+                            <span className="text-sky-400">Win11 {item.version}</span>
+                            <span aria-hidden="true">·</span>
+                            <span>Released {item.releaseDate}</span>
+                          </div>
+
+                          <p className="text-xs text-slate-400 font-mono-tabular">
+                            OS Builds: {item.build}
+                          </p>
+
+                          <p className="text-xs sm:text-sm font-semibold text-white">{item.title}</p>
+                          <p className="text-xs text-slate-300 leading-relaxed">{item.highlights}</p>
+
+                          {sup && (
+                            <p className="text-xs font-semibold text-amber-300 font-mono-tabular">
+                              Status: Superseded by {sup}
+                            </p>
+                          )}
+
+                          <div className="pt-2 border-t border-slate-800/80 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => sendSingleKbAlert(item)}
+                              className="text-xs font-medium px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center gap-1 cursor-pointer"
+                            >
+                              <Bell className="w-3 h-3 text-sky-400" />
+                              <span>Send Normal Info Alert (No Ping)</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* =================================================================
+              TAB 3: ALL VERIFIED RELEASES TIMELINE
+             ================================================================= */}
+          {activeTab === 'history' && (
+            <div className="bg-[#111827] border border-slate-800 rounded-xl divide-y divide-slate-800">
+              {updates.map((item) => {
+                const isSec = isSecurityOrCumulativeUpdate(item);
+                const sup = getSupersedingLabel(item, updates);
+                return (
+                  <div
+                    key={`all-${item.id}`}
+                    className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                  >
+                    <div className="space-y-1.5 max-w-3xl">
+                      <div className="flex flex-wrap items-center gap-2 text-xs font-mono-tabular">
+                        <span
+                          className={
+                            isSec ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'
+                          }
+                        >
+                          {isSec ? 'MANDATORY SECURITY KB' : 'OPTIONAL PREVIEW (0 RISK)'}
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span className="text-white font-bold">{item.kb}</span>
+                        <span aria-hidden="true">·</span>
+                        <span className="text-sky-400 font-semibold">Win11 {item.version}</span>
+                        <span aria-hidden="true">·</span>
+                        <span className="text-slate-300">Builds: {item.build}</span>
+                        <span aria-hidden="true">·</span>
+                        <span className="text-white font-semibold">Released {item.releaseDate}</span>
+                      </div>
+                      <p className="text-sm sm:text-base font-semibold text-white">{item.title}</p>
+                      <p className="text-xs text-slate-300 leading-relaxed">{item.highlights}</p>
+                      {item.includesPreviewKb && (
+                        <p className="text-xs text-emerald-300 font-mono-tabular">
+                          Includes all changes from: {item.includesPreviewKb}
+                        </p>
+                      )}
+                      {sup && (
+                        <p className="text-xs text-amber-300 font-mono-tabular">
+                          Superseded by: {sup}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => sendSingleKbAlert(item)}
+                        className="min-h-[38px] px-3 py-1.5 text-xs font-medium text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg whitespace-nowrap shrink-0 flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Send className="w-3.5 h-3.5 text-sky-400" />
+                        <span>Alert {item.kb}</span>
+                      </button>
+                      <a
+                        href={item.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="min-h-[38px] px-3 py-1.5 text-xs font-medium text-sky-400 bg-[#0B0F17] border border-slate-800 rounded-lg whitespace-nowrap shrink-0 flex items-center gap-1"
+                      >
+                        <span>Microsoft KB</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         {/* =====================================================================
-            STEP 4: ANDROID APK DOWNLOAD & COMPLETE SEP–NOV 2026 TIMELINE
+            STEP 4: ANDROID APK DOWNLOAD & GITHUB LIVE SYNC
            ===================================================================== */}
         <section
           id="step-apk"
@@ -1368,11 +1736,13 @@ export default function App() {
           <div className="space-y-1">
             <h3 className="text-base font-bold text-white font-display flex items-center gap-2">
               <Smartphone className="w-4 h-4 text-emerald-400" />
-              <span>Android App (.apk) &amp; Complete Verified Timeline (Sep – Nov 2026)</span>
+              <span>Android App (.apk) — Auto-Syncs with GitHub Actions Live State</span>
             </h3>
             <p className="text-xs text-slate-400">
-              Push to your <strong>mishramukti982-gif/Win11</strong> GitHub repo to rebuild the
-              Android APK with the verified November 10, 2026 release data.
+              Your standalone Android APK automatically fetches{' '}
+              <code className="text-slate-200 font-mono-tabular">state/last_seen.json</code> from{' '}
+              <strong>mishramukti982-gif/Win11</strong> so every 6-hour GitHub Action scrape updates
+              your phone automatically.
             </p>
           </div>
 
@@ -1389,15 +1759,17 @@ export default function App() {
 
             <button
               type="button"
-              onClick={() => setShowAllHistory((prev) => !prev)}
+              onClick={() =>
+                setActiveTab((prev) => (prev === 'history' ? 'summary' : 'history'))
+              }
               className="min-h-[40px] px-3.5 py-2 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg whitespace-nowrap shrink-0 flex items-center gap-1.5 cursor-pointer"
             >
               <span>
-                {showAllHistory
-                  ? 'Hide Complete Sep–Nov 2026 Table'
-                  : `Show All ${updates.length} Verified Updates`}
+                {activeTab === 'history'
+                  ? 'Back to Summary Tab'
+                  : `Show All ${updates.length} Live-Parsed KBs`}
               </span>
-              {showAllHistory ? (
+              {activeTab === 'history' ? (
                 <ChevronUp className="w-4 h-4" />
               ) : (
                 <ChevronDown className="w-4 h-4" />
@@ -1405,74 +1777,6 @@ export default function App() {
             </button>
           </div>
         </section>
-
-        {/* Full Verified Update History Table */}
-        {showAllHistory && (
-          <section className="bg-[#111827] border border-slate-800 rounded-xl divide-y divide-slate-800">
-            {updates.map((item) => {
-              const isSec = isSecurityOrCumulativeUpdate(item);
-              const sup = getSupersedingLabel(item, updates);
-              return (
-                <div
-                  key={`all-${item.id}`}
-                  className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-                >
-                  <div className="space-y-1.5 max-w-3xl">
-                    <div className="flex flex-wrap items-center gap-2 text-xs font-mono-tabular">
-                      <span
-                        className={
-                          isSec ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'
-                        }
-                      >
-                        {isSec ? 'MANDATORY SECURITY KB' : 'OPTIONAL PREVIEW (0 RISK)'}
-                      </span>
-                      <span aria-hidden="true">·</span>
-                      <span className="text-white font-bold">{item.kb}</span>
-                      <span aria-hidden="true">·</span>
-                      <span className="text-sky-400 font-semibold">Win11 {item.version}</span>
-                      <span aria-hidden="true">·</span>
-                      <span className="text-slate-300">Builds: {item.build}</span>
-                      <span aria-hidden="true">·</span>
-                      <span className="text-white font-semibold">Released {item.releaseDate}</span>
-                    </div>
-                    <p className="text-sm sm:text-base font-semibold text-white">{item.title}</p>
-                    <p className="text-xs text-slate-300 leading-relaxed">{item.highlights}</p>
-                    {item.includesPreviewKb && (
-                      <p className="text-xs text-emerald-300 font-mono-tabular">
-                        Includes all changes from: {item.includesPreviewKb}
-                      </p>
-                    )}
-                    {sup && (
-                      <p className="text-xs text-amber-300 font-mono-tabular">
-                        Superseded by: {sup}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => sendSingleKbAlert(item)}
-                      className="min-h-[38px] px-3 py-1.5 text-xs font-medium text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg whitespace-nowrap shrink-0 flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Send className="w-3.5 h-3.5 text-sky-400" />
-                      <span>Alert {item.kb}</span>
-                    </button>
-                    <a
-                      href={item.sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="min-h-[38px] px-3 py-1.5 text-xs font-medium text-sky-400 bg-[#0B0F17] border border-slate-800 rounded-lg whitespace-nowrap shrink-0 flex items-center gap-1"
-                    >
-                      <span>Microsoft KB</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-                </div>
-              );
-            })}
-          </section>
-        )}
       </main>
     </div>
   );
