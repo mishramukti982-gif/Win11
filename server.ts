@@ -926,6 +926,30 @@ async function startServer() {
     });
   });
 
+  app.get('/api/download/windows-exe', (_req, res) => {
+    const exePath = path.join(__dirname, 'public', 'Win11-Update-Notifier-Windows.exe');
+    const rootExePath = path.join(__dirname, 'Win11-Update-Notifier-Windows.exe');
+    const targetPath = fs.existsSync(exePath)
+      ? exePath
+      : fs.existsSync(rootExePath)
+      ? rootExePath
+      : null;
+
+    if (!targetPath) {
+      res.redirect(
+        'https://github.com/mishramukti982-gif/Win11/releases/download/v1.0.0/Win11-Update-Notifier-Windows.exe'
+      );
+      return;
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.microsoft.portable-executable');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="Win11-Update-Notifier-Windows.exe"'
+    );
+    res.sendFile(targetPath);
+  });
+
   const isProd = process.env.NODE_ENV === 'production';
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite');

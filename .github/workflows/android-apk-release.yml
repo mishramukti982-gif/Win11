@@ -46,6 +46,7 @@ jobs:
           '
           npm install --legacy-peer-deps
           npx vite build
+          python3 scripts/build_windows_exe.py
           cd dist && zip -r ../Win11-Update-Notifier-Web-Bundle.zip . && cd ..
 
       - name: Set up JDK 17 for Android build
@@ -66,21 +67,23 @@ jobs:
           gradle assembleDebug --no-daemon
           cp app/build/outputs/apk/debug/app-debug.apk ../Win11-Update-Notifier-Android.apk
 
-      - name: Publish APK & Web Bundle to GitHub Releases (Win11 Repo)
+      - name: Publish Windows EXE, Android APK & Web Bundle to GitHub Releases (Win11 Repo)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG_NAME="v1.0.0"
-          RELEASE_TITLE="Win11 Update Notifier — Android APK & Discord Suite ($TAG_NAME)"
-          NOTES="### 📱 Download Win11 Update Notifier for Android\n\n- **Direct Android App Installer:** Download **\`Win11-Update-Notifier-Android.apk\`** below and open it on your Android phone to install the standalone app (no Chrome address bar or tabs).\n- **Features Included:**\n  1. Live Windows 11 Release Health Tracker (26H2, 26H1, 24H2, 23H2)\n  2. Dedicated **Updates Since Date** Historical Range Explorer\n  3. Instant **Discord Webhook** & **Android Push (ntfy.sh)** Notification Center\n  4. Automated 6-Hour GitHub Actions Release Checker"
+          RELEASE_TITLE="Win11 Update Notifier — Windows EXE, Android APK & Discord Suite ($TAG_NAME)"
+          NOTES="### 💻📱 Download Win11 Update Notifier (Windows .EXE & Android .APK)\n\n- **Windows 11 Standalone Desktop App:** Download **\`Win11-Update-Notifier-Windows.exe\`** below and double-click to launch the updated WUB Safe-Window & Summary Tab desktop app.\n- **Android Standalone App:** Download **\`Win11-Update-Notifier-Android.apk\`** on your Android phone.\n- **Features Included:**\n  1. New **Summary Tab** with plain-English WUB window analysis & version-by-version KB rollup table\n  2. Live Multi-Table Microsoft Release Health Parser (26H2, 25H2, 24H2, 26H1, 23H2)\n  3. Automatic Superseding Detection (e.g., Oct 28 KB5127936 superseded by Nov 10 KB5132061)\n  4. Priority-based **Discord @everyone Webhook** & Phone Notifications"
 
           if gh release view "$TAG_NAME" >/dev/null 2>&1; then
             gh release upload "$TAG_NAME" \
+              Win11-Update-Notifier-Windows.exe \
               Win11-Update-Notifier-Android.apk \
               Win11-Update-Notifier-Web-Bundle.zip \
               --clobber
           else
             gh release create "$TAG_NAME" \
+              Win11-Update-Notifier-Windows.exe \
               Win11-Update-Notifier-Android.apk \
               Win11-Update-Notifier-Web-Bundle.zip \
               --title "$RELEASE_TITLE" \

@@ -1,0 +1,24 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.win11notifier.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.win11notifier.app"
+        minSdk 24
+        targetSdk 34
+        versionCode 2
+        versionName "1.1.0"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+}

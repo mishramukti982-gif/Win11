@@ -841,7 +841,7 @@ export default function App() {
             href="#step-apk"
             className="hover:text-white transition-colors whitespace-nowrap shrink-0"
           >
-            Android APK
+            EXE &amp; APK
           </a>
         </nav>
 
@@ -1727,26 +1727,37 @@ export default function App() {
         </section>
 
         {/* =====================================================================
-            STEP 4: ANDROID APK DOWNLOAD & GITHUB LIVE SYNC
+            STEP 4: WINDOWS .EXE & ANDROID .APK DOWNLOADS (LIVE GITHUB SYNC)
            ===================================================================== */}
         <section
           id="step-apk"
-          className="bg-[#111827] border border-slate-800 rounded-xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 scroll-mt-20"
+          className="bg-[#111827] border border-slate-800 rounded-xl p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4 scroll-mt-20"
         >
           <div className="space-y-1">
             <h3 className="text-base font-bold text-white font-display flex items-center gap-2">
               <Smartphone className="w-4 h-4 text-emerald-400" />
-              <span>Android App (.apk) — Auto-Syncs with GitHub Actions Live State</span>
+              <span>
+                Windows Desktop (.exe) &amp; Android App (.apk) — Updated with Summary Tab &amp; Live Sync
+              </span>
             </h3>
             <p className="text-xs text-slate-400">
-              Your standalone Android APK automatically fetches{' '}
-              <code className="text-slate-200 font-mono-tabular">state/last_seen.json</code> from{' '}
-              <strong>mishramukti982-gif/Win11</strong> so every 6-hour GitHub Action scrape updates
-              your phone automatically.
+              Download the standalone <strong>Win11-Update-Notifier-Windows.exe</strong> directly
+              below (or from your <strong>mishramukti982-gif/Win11</strong> GitHub Releases). Both
+              the <code>.exe</code> and <code>.apk</code> auto-sync live updates from{' '}
+              <code className="text-slate-200 font-mono-tabular">state/last_seen.json</code>.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <a
+              href="/api/download/windows-exe"
+              download="Win11-Update-Notifier-Windows.exe"
+              className="min-h-[40px] px-4 py-2 text-xs font-semibold text-slate-950 bg-sky-400 hover:bg-sky-300 rounded-lg whitespace-nowrap shrink-0 flex items-center gap-1.5"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download Updated Windows .EXE</span>
+            </a>
+
             <a
               href="https://github.com/mishramukti982-gif/Win11/releases/download/v1.0.0/Win11-Update-Notifier-Android.apk"
               target="_blank"
