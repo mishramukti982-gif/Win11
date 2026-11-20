@@ -260,8 +260,10 @@
     "KB5129242",
     "KB5131087",
     "KB5132043",
+    "KB5132057",
     "KB5132059",
     "KB5132061",
+    "KB5132265",
     "KB5134130",
     "KB5134133",
     "KB5134134"
@@ -524,7 +526,9 @@
     "KB5124006",
     "KB5124010",
     "KB5127653",
-    "KB5127936"
+    "KB5127936",
+    "KB5132057",
+    "KB5132265"
   ],
   "builds": [
     "22000.1042",
@@ -812,6 +816,7 @@
     "26100.9725",
     "26100.9911",
     "26100.9974",
+    "26200.10075",
     "26200.6584",
     "26200.6899",
     "26200.6901",
@@ -854,6 +859,7 @@
     "26200.9818",
     "26200.9911",
     "26200.9974",
+    "26300.10075",
     "26300.9457",
     "26300.9550",
     "26300.9711",
@@ -881,9 +887,36 @@
     "28000.3231",
     "28000.3237",
     "28000.3365",
-    "28000.3501"
+    "28000.3501",
+    "28000.3620"
   ],
   "recent_updates": [
+    {
+      "id": "KB5132265-28000.3620",
+      "kb": "KB5132265",
+      "build": "28000.3620",
+      "version": "26H1",
+      "type": "Out-of-Band / Preview",
+      "cadence": "D",
+      "releaseDate": "2026-11-19",
+      "title": "Optional Non-Security Preview Update (26H1)",
+      "highlights": "Optional non-security preview update (D-Release) for Windows 11 26H1 (OS Build 28000.3620). Safe to skip while Windows Update Blocker (WUB) is active.",
+      "servicingChannel": "Optional Preview (D-Release)",
+      "sourceUrl": "https://support.microsoft.com/help/5132265"
+    },
+    {
+      "id": "KB5132057-26300.10075",
+      "kb": "KB5132057",
+      "build": "26300.10075 \u00b7 26200.10075",
+      "version": "26H2 & 25H2",
+      "type": "Out-of-Band / Preview",
+      "cadence": "D",
+      "releaseDate": "2026-11-19",
+      "title": "Optional Non-Security Preview Update (26H2 & 25H2)",
+      "highlights": "Optional non-security preview update (D-Release) for Windows 11 26H2 & 25H2 (OS Build 26300.10075 \u00b7 26200.10075). Safe to skip while Windows Update Blocker (WUB) is active.",
+      "servicingChannel": "Optional Preview (D-Release)",
+      "sourceUrl": "https://support.microsoft.com/help/5132057"
+    },
     {
       "id": "KB5132061-26300.9974",
       "kb": "KB5132061",
@@ -1450,8 +1483,7 @@
       "highlights": "Mandatory monthly Patch Tuesday security update for Windows 11 25H2 & 24H2 (OS Build 26200.8457 \u00b7 26100.8457). Includes cumulative security patches and prior preview fixes.",
       "servicingChannel": "General Availability (Mandatory B-Release)",
       "sourceUrl": "https://support.microsoft.com/help/5089549",
-      "supersededBy": "KB5132061 (2026-11-10 Patch Tuesday)",
-      "includesPreviewKb": "KB5083631 (Released 2026-04-30)"
+      "supersededBy": "KB5132061 (2026-11-10 Patch Tuesday)"
     },
     {
       "id": "KB5089548-28000.2113",
@@ -1465,8 +1497,7 @@
       "highlights": "Mandatory monthly Patch Tuesday security update for Windows 11 26H1 (OS Build 28000.2113). Includes cumulative security patches and prior preview fixes.",
       "servicingChannel": "General Availability (Mandatory B-Release)",
       "sourceUrl": "https://support.microsoft.com/help/5089548",
-      "supersededBy": "KB5132059 (2026-11-10 Patch Tuesday)",
-      "includesPreviewKb": "KB5083806 (Released 2026-04-30)"
+      "supersededBy": "KB5132059 (2026-11-10 Patch Tuesday)"
     },
     {
       "id": "KB5089466-26200.8390",
@@ -1495,35 +1526,7 @@
       "servicingChannel": "General Availability (Mandatory B-Release)",
       "sourceUrl": "https://support.microsoft.com/help/5087420",
       "supersededBy": "KB5131087 (2026-11-10 Patch Tuesday)"
-    },
-    {
-      "id": "KB5083806-28000.1896",
-      "kb": "KB5083806",
-      "build": "28000.1896",
-      "version": "26H1",
-      "type": "Out-of-Band / Preview",
-      "cadence": "D",
-      "releaseDate": "2026-04-30",
-      "title": "Optional Non-Security Preview Update (26H1)",
-      "highlights": "Optional non-security preview update (D-Release) for Windows 11 26H1 (OS Build 28000.1896). Safe to skip while Windows Update Blocker (WUB) is active.",
-      "servicingChannel": "Optional Preview (D-Release)",
-      "sourceUrl": "https://support.microsoft.com/help/5083806",
-      "supersededBy": "KB5132059 (2026-11-10 Patch Tuesday)"
-    },
-    {
-      "id": "KB5083631-26200.8328",
-      "kb": "KB5083631",
-      "build": "26200.8328 \u00b7 26100.8328",
-      "version": "25H2 & 24H2",
-      "type": "Out-of-Band / Preview",
-      "cadence": "D",
-      "releaseDate": "2026-04-30",
-      "title": "Optional Non-Security Preview Update (25H2 & 24H2)",
-      "highlights": "Optional non-security preview update (D-Release) for Windows 11 25H2 & 24H2 (OS Build 26200.8328 \u00b7 26100.8328). Safe to skip while Windows Update Blocker (WUB) is active.",
-      "servicingChannel": "Optional Preview (D-Release)",
-      "sourceUrl": "https://support.microsoft.com/help/5083631",
-      "supersededBy": "KB5132061 (2026-11-10 Patch Tuesday)"
     }
   ],
-  "last_checked_utc": "2026-11-16T08:06:02.341251+00:00"
+  "last_checked_utc": "2026-11-20T00:58:13.691508+00:00"
 }
